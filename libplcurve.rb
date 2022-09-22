@@ -4,7 +4,7 @@
 class Libplcurve < Formula
   desc "plcurve is a library for polygonal curves"
   homepage "https://www.jasoncantarella.com/"
-  url "https://github.com/designbynumbers/plcurve/raw/master/libplcurve-10.1.0.tar.gz"
+  url "https://github.com/designbynumbers/plcurve/releases/download/v10.1.0/libplcurve-10.1.0.tar.gz"
   sha256 "4323c02705668639c9389f5f96dc8d31f97582e106814ce71d486688c1b4f092"
   license "GPL-1.0-or-later"
 
