@@ -4,7 +4,7 @@
 class Libtsnnls < Formula
   desc "tsnnls is a fast solver for sparse non-negative least squares problems"
   homepage "https://www.jasoncantarella.com/wordpress/software/tsnnls/"
-  url "https://github.com/designbynumbers/tsnnls/releases/download/libtsnnls-2.4.5.tar.gz"
+  url "https://github.com/designbynumbers/tsnnls/releases/download/v.2.4.5/libtsnnls-2.4.5.tar.gz"
   sha256 "e7428a63a1cafbbd94cf035aa35e7bcf65f8935547c12529f481222f3be76935"
   license "GPL-1.0-or-later"
 
