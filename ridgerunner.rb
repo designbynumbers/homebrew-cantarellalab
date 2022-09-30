@@ -4,7 +4,7 @@
 class Ridgerunner < Formula
   desc "ridgerunner is a knot-tightening program"
   homepage "https://www.jasoncantarella.com/wordpress/software/ridgerunner/"
-  url "https://github.com/designbynumbers/tsnnls/releases/download/v.2.4.5/libtsnnls-2.4.5.tar.gz"
+  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.1.1alpha/ridgerunner-2.1.1.tar.gz"
   sha256 "782b29dc38e033373bd7ab3d59dcb906a28ed10e13d8718452d8329af52d6f46"
   license "GPL-1.0-or-later"
 
