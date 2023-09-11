@@ -4,8 +4,8 @@
 class Libplcurve < Formula
   desc "plcurve is a library for polygonal curves"
   homepage "https://www.jasoncantarella.com/"
-  url "https://github.com/designbynumbers/plcurve/releases/download/v10.1.0/libplcurve-10.1.0.tar.gz"
-  sha256 "4323c02705668639c9389f5f96dc8d31f97582e106814ce71d486688c1b4f092"
+  url "https://github.com/designbynumbers/plcurve/releases/download/v10.2.0/libplcurve-10.2.0.tar.gz"
+  sha256 "456bc6e93701c0a7a8bf559561e15bd7ad63c0dfb48b8ff4794d46c0e8dc85e6"
   license "GPL-1.0-or-later"
 
   # depends_on "cmake" => :build
