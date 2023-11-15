@@ -8,6 +8,7 @@ class Ridgerunner < Formula
   sha256 "63a21dfe52ddaf58f698a80ef2776dccfbdfcf253e4702d95b9dd61a23def4b4"
   license "GPL-1.0-or-later"
 
+  uses_from_macos "ncurses"
   depends_on "openblas"
   depends_on "argtable"
   depends_on "gsl"
