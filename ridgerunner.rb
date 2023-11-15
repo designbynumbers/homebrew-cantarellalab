@@ -4,11 +4,9 @@
 class Ridgerunner < Formula
   desc "ridgerunner is a knot-tightening program"
   homepage "https://www.jasoncantarella.com/wordpress/software/ridgerunner/"
-  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.1.1alpha/ridgerunner-2.1.1.tar.gz"
-  sha256 "782b29dc38e033373bd7ab3d59dcb906a28ed10e13d8718452d8329af52d6f46"
+  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.2.2alpha/ridgerunner-2.2.2.tar.gz"
+  sha256 "63a21dfe52ddaf58f698a80ef2776dccfbdfcf253e4702d95b9dd61a23def4b4"
   license "GPL-1.0-or-later"
-
-  # depends_on "cmake" => :build
 
   depends_on "openblas"
   depends_on "argtable"
