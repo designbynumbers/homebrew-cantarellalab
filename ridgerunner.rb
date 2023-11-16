@@ -6,7 +6,7 @@ class Ridgerunner < Formula
   homepage "https://www.jasoncantarella.com/wordpress/software/ridgerunner/"
   url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.2.2/ridgerunner-2.2.2.tar.gz"
 
-  sha256 "63a21dfe52ddaf58f698a80ef2776dccfbdfcf253e4702d95b9dd61a23def4b4"
+  sha256 "481332a5623063cd23f3077db8b0757f6331e1ff1e1c88a111d6dd70536fab66"
   license "GPL-1.0-or-later"
 
   uses_from_macos "ncurses"
