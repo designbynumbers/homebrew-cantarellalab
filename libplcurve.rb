@@ -1,14 +1,11 @@
 # Documentation: https://docs.brew.sh/Formula-Cookbook
 #                https://rubydoc.brew.sh/Formula
-# PLEASE REMOVE ALL GENERATED COMMENTS BEFORE SUBMITTING YOUR PULL REQUEST!
 class Libplcurve < Formula
   desc "plcurve is a library for polygonal curves"
   homepage "https://www.jasoncantarella.com/"
   url "https://github.com/designbynumbers/plcurve/releases/download/v11.0.0/libplcurve-11.0.0.tar.gz"
   sha256 "1e2ba1d94637f376d0cb2026b12f1bc0340422c5be32ecd368e970bf7704b5f6"
   license "GPL-1.0-or-later"
-
-  # depends_on "cmake" => :build
 
   depends_on "gsl"
 
