@@ -3,7 +3,7 @@
 class Libplcurve < Formula
   desc "plcurve is a library for polygonal curves"
   homepage "https://www.jasoncantarella.com/"
-  url "https://github.com/designbynumbers/plcurve/releases/download/v11.1.1/libplcurve-11.0.0.tar.gz"
+  url "https://github.com/designbynumbers/plcurve/releases/download/v11.1.1/libplcurve-11.1.1.tar.gz"
   sha256 "41a47ec7643c8feb4d324ce4f15a61f4695ee7c26a8060ef3f51f54c1dfb09a0"
   license "GPL-1.0-or-later"
 
