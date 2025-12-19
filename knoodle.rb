@@ -14,7 +14,7 @@ class Knoodle < Formula
   
   license "MIT"  # Verify the actual license
 
-  bottle: unneeded
+  bottle :unneeded
 
   depends_on "boost"
   depends_on "metis"
