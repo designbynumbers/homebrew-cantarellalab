@@ -4,7 +4,7 @@ class Knoodle < Formula
   desc "Computational knot theory library with PolyFold knot-tightening"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
   url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v0.2.0-alpha/knoodle-0.2.0-alpha.tar.gz"
-  sha256 "b973cb108c314cfe37780dd5cfe9316f242e6421c874f588fee3d6cbb9b1396b" # Replace with actual SHA256 from the script
+  sha256 "d2ebde332341eb0181b365f82a308ca122b3d1aa36a9e19c12dfacaad9838d7e" # Replace with actual SHA256 from the script
   license "MIT"  # Verify the actual license
   
   bottle do
