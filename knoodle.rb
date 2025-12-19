@@ -19,6 +19,13 @@ class Knoodle < Formula
   # Optional dependencies that might be needed
   #depends_on "gsl" => :recommended
   #depends_on "argtable" => :optional
+
+  def pour_bottle?
+    reason "This formula requires CPU-specific optimizations for performance"
+    # Logic to determine if the bottle should be used (returns true or false)
+    # e.g., return false if a specific condition is met that would break the bottle
+    false # By default, Homebrew assumes bottles can be poured
+  end
   
   def install
 
