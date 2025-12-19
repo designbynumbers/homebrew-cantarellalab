@@ -3,14 +3,19 @@
 class Knoodle < Formula
   desc "Computational knot theory library with PolyFold knot-tightening"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v0.2.1-alpha/knoodle-0.2.1-alpha.tar.gz"
-  sha256 "fe8b3ba3231d4df6ee75c2cb1972646ce4795a87d16eff9bbe5d40d1f6ddd00e" # Replace with actual SHA256 from the script
+
+  url "https://github.com/HenrikSchumacher/Knoodle.git",
+      tag: "v0.2.1-alpha",
+      revision: "37b11b1e2f3cd9590100e20a3e1b8662ed0743d8"  
+  version "0.2.1-alpha"
+  
+  #url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v0.2.1-alpha/knoodle-0.2.1-alpha.tar.gz"
+  #sha256 "fe8b3ba3231d4df6ee75c2cb1972646ce4795a87d16eff9bbe5d40d1f6ddd00e" # Replace with actual SHA256 from the script
+  
   license "MIT"  # Verify the actual license
-  
-  bottle do
-    # Bottle specs will be added here after first successful build
-  end
-  
+
+  bottle: unneeded
+
   depends_on "boost"
   depends_on "metis"
   depends_on "clp" 
@@ -28,6 +33,9 @@ class Knoodle < Formula
   end
   
   def install
+
+    # Handle submodules - Homebrew doesn't automatically fetch them
+    system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
 
     ENV.O3  # Force -O3
     ENV.append_to_cflags "-march=native" if build.bottle?
