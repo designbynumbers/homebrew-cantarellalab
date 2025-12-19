@@ -6,7 +6,6 @@ class Knoodle < Formula
   url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v0.2.1-alpha/knoodle-0.2.1-alpha.tar.gz"
   sha256 "fe8b3ba3231d4df6ee75c2cb1972646ce4795a87d16eff9bbe5d40d1f6ddd00e" # Replace with actual SHA256 from the script
   license "MIT"  # Verify the actual license
-  env :std
   
   bottle do
     # Bottle specs will be added here after first successful build
@@ -22,6 +21,19 @@ class Knoodle < Formula
   #depends_on "argtable" => :optional
   
   def install
+
+    ENV.O3  # Force -O3
+    ENV.append_to_cflags "-march=native" if build.bottle?
+    
+    # Critical: Tell superenv not to sanitize these specific flags
+    ENV.runtime_cpu_detection if build.bottle?
+    
+    # For non-bottled builds, force native optimization
+    if !build.bottle?
+      ENV.append "HOMEBREW_OPTFLAGS", "-march=native"
+      ENV.append "HOMEBREW_OPTFLAGS", "-mtune=native"
+    end
+
     # Pass version to the Makefile
     ENV["KNOODLE_VERSION"] = version.to_s
     
