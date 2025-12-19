@@ -17,8 +17,8 @@ class Knoodle < Formula
   depends_on "suite-sparse"
   
   # Optional dependencies that might be needed
-  depends_on "gsl" => :recommended
-  depends_on "argtable" => :optional
+  #depends_on "gsl" => :recommended
+  #depends_on "argtable" => :optional
   
   def install
     # Pass version to the Makefile
@@ -28,10 +28,10 @@ class Knoodle < Formula
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
     
     # Handle architecture-specific flags
-    if Hardware::CPU.arm?
+    #if Hardware::CPU.arm?
       # For Apple Silicon
-      ENV["CXXFLAGS"] = "-mcpu=apple-m1"
-    end
+    #  ENV["CXXFLAGS"] = "-mcpu=apple-m1"
+    #end
     
     # Build and install PolyFold
     cd "PolyFold" do
