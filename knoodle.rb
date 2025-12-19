@@ -30,7 +30,7 @@ class Knoodle < Formula
     # Handle architecture-specific flags
     if Hardware::CPU.arm?
       # For Apple Silicon
-      ENV["CXXFLAGS"] = "-mcpu=apple-m1"
+      ENV.append "CXXFLAGS", "-mcpu=apple-m1"
     end
     
     # Build and install PolyFold
