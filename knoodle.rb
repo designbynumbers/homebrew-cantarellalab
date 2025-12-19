@@ -28,10 +28,10 @@ class Knoodle < Formula
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
     
     # Handle architecture-specific flags
-    #if Hardware::CPU.arm?
+    if Hardware::CPU.arm?
       # For Apple Silicon
-    #  ENV["CXXFLAGS"] = "-mcpu=apple-m1"
-    #end
+      ENV["CXXFLAGS"] = "-mcpu=apple-m1"
+    end
     
     # Build and install PolyFold
     cd "PolyFold" do
