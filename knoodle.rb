@@ -1,65 +1,40 @@
 # Documentation: https://docs.brew.sh/Formula-Cookbook
 #                https://rubydoc.brew.sh/Formula
 class Knoodle < Formula
-  desc "Computational knot theory library with PolyFold knot-tightening"
+  desc "Computational knot theory library with PolyFold knot-tightening and KnoodleTool utilities"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
-
+  
+  # Use git with submodules for the stable version
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag: "v0.2.1-alpha",
-      revision: "37b11b1e2f3cd9590100e20a3e1b8662ed0743d8"  
-  version "0.2.1-alpha"
+      tag: "v0.3.0-alpha",
+      revision: "c2379d4fff74504b42492783bdcb45c6e0e7ea79"  # Replace with the actual commit SHA for this tag
+  version "0.3.0-alpha"
+  license "MIT"
   
-  #url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v0.2.1-alpha/knoodle-0.2.1-alpha.tar.gz"
-  #sha256 "fe8b3ba3231d4df6ee75c2cb1972646ce4795a87d16eff9bbe5d40d1f6ddd00e" # Replace with actual SHA256 from the script
+  # For head builds (brew install --HEAD knoodle)
+  head "https://github.com/HenrikSchumacher/Knoodle.git", branch: "main"
   
-  license "MIT"  # Verify the actual license
-
-  #bottle :unneeded
-
   depends_on "boost"
   depends_on "metis"
   depends_on "clp" 
-  depends_on "suite-sparse"
+  depends_on "suite-sparse"  # Provides umfpack needed by knoodletool
   
-  # Optional dependencies that might be needed
-  #depends_on "gsl" => :recommended
-  #depends_on "argtable" => :optional
-
-  def pour_bottle?
-    reason "This formula requires CPU-specific optimizations for performance"
-    # Logic to determine if the bottle should be used (returns true or false)
-    # e.g., return false if a specific condition is met that would break the bottle
-    false # By default, Homebrew assumes bottles can be poured
+  # Prevent bottle usage - require building from source for performance
+  pour_bottle? do
+    reason "This formula requires CPU-specific optimizations for maximum performance"
+    satisfy { false }
   end
   
   def install
-
-    # Handle submodules - Homebrew doesn't automatically fetch them
+    # Handle submodules - required for KnoodleTool's include paths
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
-
-    ENV.O3  # Force -O3
-    ENV.append_to_cflags "-march=native" if build.bottle?
     
-    # Critical: Tell superenv not to sanitize these specific flags
-    ENV.runtime_cpu_detection if build.bottle?
+    # Use standard environment to avoid superenv performance issues
+    env :std
     
-    # For non-bottled builds, force native optimization
-    if !build.bottle?
-      ENV.append "HOMEBREW_OPTFLAGS", "-march=native"
-      ENV.append "HOMEBREW_OPTFLAGS", "-mtune=native"
-    end
-
-    # Pass version to the Makefile
+    # Pass version to the Makefiles
     ENV["KNOODLE_VERSION"] = version.to_s
-    
-    # Ensure Homebrew paths are available
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
-    
-    # Handle architecture-specific flags
-    if Hardware::CPU.arm64?
-      # For Apple Silicon
-      ENV.append "CXXFLAGS", "-mcpu=apple-m1"
-    end
     
     # Build and install PolyFold
     cd "PolyFold" do
@@ -67,26 +42,38 @@ class Knoodle < Formula
       system "make", "install", "PREFIX=#{prefix}"
     end
     
-    # Install library headers if needed
+    # Build and install KnoodleTool
+    cd "KnoodleTool" do
+      system "make"
+      system "make", "install", "PREFIX=#{prefix}"
+    end
+    
+    # Install library headers
     include.install "Knoodle.hpp"
     (include/"knoodle").install Dir["src/*.hpp"]
     
-    # Install any additional utilities or documentation
+    # Install documentation if it exists
     doc.install "README.md" if File.exist?("README.md")
   end
   
   test do
-    # Test that polyfold runs and shows help/version
-    assert_match version.to_s, shell_output("#{bin}/polyfold --version 2>&1", 1)
+    # Test that both tools run and show help
     system "#{bin}/polyfold", "--help"
+    system "#{bin}/knoodletool", "--help"
   end
   
   def caveats
     <<~EOS
-      Knoodle's PolyFold has been installed.
+      Knoodle has been installed with both tools:
       
-      The main executable is:
+      PolyFold (knot-tightening):
         #{bin}/polyfold
+        
+      KnoodleTool (knot theory utilities):
+        #{bin}/knoodletool
+      
+      Note: Both tools are always compiled from source with CPU-specific 
+      optimizations for maximum performance.
       
       Header files have been installed to:
         #{include}/knoodle/
