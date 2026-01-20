@@ -9,7 +9,7 @@ class Knoodle < Formula
   # Use git with submodules for the stable version
   url "https://github.com/HenrikSchumacher/Knoodle.git",
       tag: "v0.3.0-alpha",
-      revision: "ACTUAL_COMMIT_SHA_HERE",  # Replace with the actual commit SHA for this tag
+      revision: "c2379d4fff74504b42492783bdcb45c6e0e7ea79",  # Replace with the actual commit SHA for this tag
       using: GitLFSDownloadStrategy
   version "0.3.0-alpha"
   license "MIT"
