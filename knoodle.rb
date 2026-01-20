@@ -21,7 +21,7 @@ class Knoodle < Formula
   depends_on "metis"
   depends_on "clp" 
   depends_on "suite-sparse"  # Provides umfpack needed by knoodletool
-  depends_on "git-lfs" => :build  # Required for cloning repository with LFS files
+  depends_on "git-lfs"  # Required for cloning repository with LFS files
   
   # Prevent bottle usage - require building from source for performance
   pour_bottle? do
@@ -68,6 +68,17 @@ class Knoodle < Formula
   
   def caveats
     <<~EOS
+      IMPORTANT: This formula requires Git LFS to clone the repository.
+      
+      If installation fails with "git-lfs: command not found", please run:
+      
+        brew install git-lfs
+        git lfs install
+        
+      Then retry the installation with:
+      
+        brew install cantarellalab/cantarellalab/knoodle
+      
       Knoodle has been installed with both tools:
       
       PolyFold (knot-tightening):
