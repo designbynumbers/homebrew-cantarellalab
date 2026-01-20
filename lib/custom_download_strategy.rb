@@ -1,37 +1,24 @@
 require "download_strategy"
 
 class GitLFSDownloadStrategy < GitDownloadStrategy
-  def clone_repo
+  def fetch(timeout: nil)
     # Ensure git-lfs is available
-    unless which("git-lfs")
-      system "brew", "install", "git-lfs" unless quiet_system "git-lfs", "version"
+    unless system("which", "git-lfs", out: File::NULL, err: File::NULL)
+      system "brew", "install", "git-lfs"
     end
     
-    # Initialize git-lfs
-    safe_system "git", "lfs", "install", "--local"
+    # Initialize git-lfs globally if not already done
+    system "git", "lfs", "install", out: File::NULL, err: File::NULL
     
     super
   end
 
-  def checkout
+  def stage
     super
     
-    # Pull LFS files after checkout
-    in_cache do
-      safe_system "git", "lfs", "pull"
+    # Pull LFS files after staging
+    if cached_location.exist? && (cached_location/".git").exist?
+      system "git", "-C", cached_location.to_s, "lfs", "pull", out: File::NULL, err: File::NULL
     end
-  end
-
-  private
-
-  def which(cmd)
-    exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
-    ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
-      exts.each { |ext|
-        exe = File.join(path, "#{cmd}#{ext}")
-        return exe if File.executable?(exe) && !File.directory?(exe)
-      }
-    end
-    return nil
   end
 end
