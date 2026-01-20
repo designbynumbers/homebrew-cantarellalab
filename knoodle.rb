@@ -1,5 +1,7 @@
 # Documentation: https://docs.brew.sh/Formula-Cookbook
 #                https://rubydoc.brew.sh/Formula
+require_relative "lib/custom_download_strategy"
+
 class Knoodle < Formula
   desc "Computational knot theory library with PolyFold knot-tightening and KnoodleTool utilities"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
@@ -7,7 +9,8 @@ class Knoodle < Formula
   # Use git with submodules for the stable version
   url "https://github.com/HenrikSchumacher/Knoodle.git",
       tag: "v0.3.0-alpha",
-      revision: "c2379d4fff74504b42492783bdcb45c6e0e7ea79"  # Replace with the actual commit SHA for this tag
+      revision: "ACTUAL_COMMIT_SHA_HERE",  # Replace with the actual commit SHA for this tag
+      using: GitLFSDownloadStrategy
   version "0.3.0-alpha"
   license "MIT"
   
@@ -18,6 +21,7 @@ class Knoodle < Formula
   depends_on "metis"
   depends_on "clp" 
   depends_on "suite-sparse"  # Provides umfpack needed by knoodletool
+  depends_on "git-lfs" => :build  # Required for cloning repository with LFS files
   
   # Prevent bottle usage - require building from source for performance
   pour_bottle? do
