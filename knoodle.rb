@@ -6,39 +6,50 @@ class Knoodle < Formula
   desc "Computational knot theory library with PolyFold knot-tightening and KnoodleTool utilities"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
   
-  # Use git with submodules for the stable version
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag: "v0.3.0-alpha",
-      revision: "c2379d4fff74504b42492783bdcb45c6e0e7ea79",  # Replace with the actual commit SHA for this tag
+      tag: "v0.3.1-alpha",
+      revision: "6c10821bf261c788748521eca61aaeec9142354a",
       using: GitLFSDownloadStrategy
-  version "0.3.0-alpha"
+  version "0.3.1-alpha"
   license "MIT"
   
-  # For head builds (brew install --HEAD knoodle)
   head "https://github.com/HenrikSchumacher/Knoodle.git", branch: "main"
   
   depends_on "boost"
   depends_on "metis"
   depends_on "clp" 
-  depends_on "suite-sparse"  # Provides umfpack needed by knoodletool
-  depends_on "git-lfs"  # Required for cloning repository with LFS files
+  depends_on "suite-sparse"
+  depends_on "git-lfs"
   
-  # Prevent bottle usage - require building from source for performance
+  # Use LLVM/clang consistently on Linux to avoid ABI issues with bottles
+  depends_on "llvm" if OS.linux?
+  
   pour_bottle? do
     reason "This formula requires CPU-specific optimizations for maximum performance"
     satisfy { false }
   end
   
   def install
-    # Handle submodules - required for KnoodleTool's include paths
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
     
-    # Use standard environment to avoid superenv performance issues
     env :std
     
-    # Pass version to the Makefiles
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
+    
+    # Use consistent compiler approach based on OS
+    if OS.linux?
+      # On Linux, use brewed clang to match how we'll rebuild dependencies
+      llvm_prefix = Formula["llvm"].opt_prefix
+      ENV["CC"] = "#{llvm_prefix}/bin/clang"
+      ENV["CXX"] = "#{llvm_prefix}/bin/clang++"
+      ENV["LDFLAGS"] = "-L#{llvm_prefix}/lib -Wl,-rpath,#{llvm_prefix}/lib"
+      ENV["CPPFLAGS"] = "-I#{llvm_prefix}/include"
+    elsif OS.mac?
+      # On macOS, use system clang
+      ENV["CXX"] = "clang++"
+      ENV["CC"] = "clang"
+    end
     
     # Build and install PolyFold
     cd "PolyFold" do
@@ -52,21 +63,24 @@ class Knoodle < Formula
       system "make", "install", "PREFIX=#{prefix}"
     end
     
-    # Install library headers
     include.install "Knoodle.hpp"
     (include/"knoodle").install Dir["src/*.hpp"]
-    
-    # Install documentation if it exists
     doc.install "README.md" if File.exist?("README.md")
   end
   
   test do
-    # Test that both tools run and show help
     system "#{bin}/polyfold", "--help"
     system "#{bin}/knoodletool", "--help"
   end
   
   def caveats
+    os_name = OS.mac? ? "macOS" : "Linux"
+    compiler_info = if OS.linux?
+      "Homebrew LLVM/clang to ensure ABI compatibility with dependencies"
+    else
+      "system clang"
+    end
+    
     <<~EOS
       IMPORTANT: This formula requires Git LFS to clone the repository.
       
@@ -75,11 +89,9 @@ class Knoodle < Formula
         brew install git-lfs
         git lfs install
         
-      Then retry the installation with:
+      Then retry the installation.
       
-        brew install cantarellalab/cantarellalab/knoodle
-      
-      Knoodle has been installed with both tools:
+      Knoodle has been installed with both tools optimized for #{os_name} using #{compiler_info}:
       
       PolyFold (knot-tightening):
         #{bin}/polyfold
@@ -87,8 +99,9 @@ class Knoodle < Formula
       KnoodleTool (knot theory utilities):
         #{bin}/knoodletool
       
-      Note: Both tools are always compiled from source with CPU-specific 
-      optimizations for maximum performance.
+      Note: On Linux, this formula uses Homebrew's LLVM to ensure ABI compatibility
+      with dependencies like Boost. All components are compiled from source with
+      CPU-specific optimizations for maximum performance.
       
       Header files have been installed to:
         #{include}/knoodle/
