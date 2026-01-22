@@ -7,10 +7,10 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
   
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag: "v0.3.1-alpha",
-      revision: "6c10821bf261c788748521eca61aaeec9142354a",
+      tag: "v0.3.0-alpha",
+      revision: "ACTUAL_COMMIT_SHA_HERE",
       using: GitLFSDownloadStrategy
-  version "0.3.1-alpha"
+  version "0.3.0-alpha"
   license "MIT"
   
   head "https://github.com/HenrikSchumacher/Knoodle.git", branch: "main"
@@ -30,6 +30,15 @@ class Knoodle < Formula
   end
   
   def install
+    # Warn users about potentially long compilation time
+    if OS.linux?
+      ohai "Linux detected: This installation may take 20-30 minutes"
+      ohai "Recompiling dependencies with LLVM/clang for ABI compatibility..."
+      ohai "Please be patient - this ensures optimal performance and stability."
+      puts ""
+    end
+    
+    ohai "Cloning repository and initializing submodules..."
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
     
     env :std
@@ -39,12 +48,17 @@ class Knoodle < Formula
     
     # Use consistent compiler approach based on OS
     if OS.linux?
+      ohai "Setting up LLVM/clang toolchain for Linux build..."
       # On Linux, use brewed clang to match how we'll rebuild dependencies
       llvm_prefix = Formula["llvm"].opt_prefix
       ENV["CC"] = "#{llvm_prefix}/bin/clang"
       ENV["CXX"] = "#{llvm_prefix}/bin/clang++"
       ENV["LDFLAGS"] = "-L#{llvm_prefix}/lib -Wl,-rpath,#{llvm_prefix}/lib"
       ENV["CPPFLAGS"] = "-I#{llvm_prefix}/include"
+      
+      puts "Using compiler: #{ENV["CXX"]}"
+      puts "LDFLAGS: #{ENV["LDFLAGS"]}"
+      puts ""
     elsif OS.mac?
       # On macOS, use system clang
       ENV["CXX"] = "clang++"
@@ -52,20 +66,27 @@ class Knoodle < Formula
     end
     
     # Build and install PolyFold
+    ohai "Building PolyFold (knot-tightening tool)..."
     cd "PolyFold" do
       system "make"
       system "make", "install", "PREFIX=#{prefix}"
     end
     
     # Build and install KnoodleTool
+    ohai "Building KnoodleTool (knot theory utilities)..."
     cd "KnoodleTool" do
       system "make"
       system "make", "install", "PREFIX=#{prefix}"
     end
     
+    ohai "Installing headers and documentation..."
     include.install "Knoodle.hpp"
     (include/"knoodle").install Dir["src/*.hpp"]
     doc.install "README.md" if File.exist?("README.md")
+    
+    ohai "Installation complete!"
+    puts "Test with: #{bin}/polyfold --help"
+    puts "           #{bin}/knoodletool --help"
   end
   
   test do
@@ -84,12 +105,14 @@ class Knoodle < Formula
     <<~EOS
       IMPORTANT: This formula requires Git LFS to clone the repository.
       
-      If installation fails with "git-lfs: command not found", please run:
+      If installation fails with Git LFS errors, please run:
       
         brew install git-lfs
         git lfs install
         
-      Then retry the installation.
+      Then retry the installation with:
+      
+        brew install knoodle
       
       Knoodle has been installed with both tools optimized for #{os_name} using #{compiler_info}:
       
