@@ -7,10 +7,10 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
   
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag: "v0.3.0-alpha",
-      revision: "ACTUAL_COMMIT_SHA_HERE",
+      tag: "v0.3.2-alpha",
+      revision: "0f84dbe533b1ad0666f4aafb0819f5c38b496dce",
       using: GitLFSDownloadStrategy
-  version "0.3.0-alpha"
+  version "0.3.2-alpha"
   license "MIT"
   
   head "https://github.com/HenrikSchumacher/Knoodle.git", branch: "main"
