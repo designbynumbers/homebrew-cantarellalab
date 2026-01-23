@@ -6,7 +6,7 @@ class Knoodle < Formula
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
       tag:      "v0.3.4-alpha",
-      revision: "0f84dbe533b1ad0666f4aafb0819f5c38b496dce",
+      revision: "c3a812751941d951e6ae02cafbf715df73c39a4c",
       using:    GitLFSDownloadStrategy
   license "MIT"
 
