@@ -5,8 +5,8 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v0.3.13-alpha",
-      revision: "5de12593440cf276af4c7ad7479d73c4c1d6841b",
+      tag:      "v0.3.20-alpha",
+      revision: "bf4dac3020ef49c536d728782e1c7a42cdbaf444",
       using:    GitLFSDownloadStrategy
   license "MIT"
 
@@ -20,16 +20,14 @@ class Knoodle < Formula
   depends_on "boost"
   depends_on "clp"
   depends_on "git-lfs"
-  depends_on "llvm" if OS.linux?
   depends_on "metis"
   depends_on "suite-sparse"
 
   def install
     # Warn users about potentially long compilation time
     if OS.linux?
-      ohai "Linux detected: This installation may take 20-30 minutes"
-      ohai "Recompiling dependencies with LLVM/clang for ABI compatibility..."
-      ohai "Please be patient - this ensures optimal performance and stability."
+      ohai "Linux detected: Building with system gcc for ecosystem compatibility"
+      ohai "This installation may take 5-10 minutes (using standard packages)"
       puts ""
     end
 
@@ -41,24 +39,13 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
-    # Use consistent compiler approach based on OS
-    if OS.linux?
-      ohai "Setting up LLVM/clang toolchain for Linux build..."
-      # On Linux, use brewed clang to match how we'll rebuild dependencies
-      llvm_prefix = Formula["llvm"].opt_prefix
-      ENV["CC"] = "#{llvm_prefix}/bin/clang"
-      ENV["CXX"] = "#{llvm_prefix}/bin/clang++"
-      ENV["LDFLAGS"] = "-L#{llvm_prefix}/lib -Wl,-rpath,#{llvm_prefix}/lib"
-      ENV["CPPFLAGS"] = "-I#{llvm_prefix}/include"
-
-      puts "Using compiler: #{ENV["CXX"]}"
-      puts "LDFLAGS: #{ENV["LDFLAGS"]}"
-      puts ""
-    elsif OS.mac?
+    # Use system compilers (no special setup needed)
+    if OS.mac?
       # On macOS, use system clang
       ENV["CXX"] = ENV.cxx
       ENV["CC"] = ENV.cc
     end
+    # On Linux, just use default gcc (no special ENV setup needed)
 
     # Build and install PolyFold
     ohai "Building PolyFold (knot-tightening tool)..."
@@ -87,7 +74,7 @@ class Knoodle < Formula
   def caveats
     os_name = OS.mac? ? "macOS" : "Linux"
     compiler_info = if OS.linux?
-      "Homebrew LLVM/clang to ensure ABI compatibility with dependencies"
+      "system gcc for ecosystem compatibility"
     else
       "system clang"
     end
@@ -112,9 +99,8 @@ class Knoodle < Formula
       KnoodleTool (knot theory utilities):
         #{bin}/knoodletool
 
-      Note: On Linux, this formula uses Homebrew's LLVM to ensure ABI compatibility
-      with dependencies like Boost. All components are compiled from source with
-      CPU-specific optimizations for maximum performance.
+      Note: On Linux, this formula uses system gcc for compatibility with standard
+      Homebrew packages, providing fast installation with CPU-specific optimizations.
 
       Header files have been installed to:
         #{include}/knoodle/
