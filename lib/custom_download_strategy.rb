@@ -57,6 +57,14 @@ class GitLFSDownloadStrategy < GitDownloadStrategy
              exception: false, out: $stdout, err: $stderr)
       puts "✅ [GitLFS] LFS files downloaded successfully"
       
+      # Configure Git to use HTTPS instead of SSH for submodules (fixes WSL2/no SSH key systems)
+      puts "🔍 [GitLFS] Configuring HTTPS rewriting for submodules..."
+      system("git", "config", "--local", "url.https://github.com/.insteadOf", "git@github.com:",
+             chdir: cached_location.to_s, exception: false)
+      system("git", "config", "--local", "url.https://github.com/.insteadOf", "ssh://git@github.com/",
+             chdir: cached_location.to_s, exception: false)
+      puts "✅ [GitLFS] SSH->HTTPS rewriting configured for submodules"
+      
     rescue => e
       puts "❌ [GitLFS] Download failed: #{e.message}"
       puts "🔍 [GitLFS] Current directory: #{Dir.pwd}"
