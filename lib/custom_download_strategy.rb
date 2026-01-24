@@ -57,6 +57,41 @@ class GitLFSDownloadStrategy < GitDownloadStrategy
              exception: false, out: $stdout, err: $stderr)
       puts "✅ [GitLFS] LFS files downloaded successfully"
       
+      # CRITICAL: Fix SSH submodule URLs immediately after clone, before any submodule operations
+      puts "🔍 [GitLFS] Checking for SSH submodules to convert to HTTPS..."
+      gitmodules_path = File.join(cached_location.to_s, ".gitmodules")
+      if File.exist?(gitmodules_path)
+        puts "🔍 [GitLFS] Found .gitmodules at: #{gitmodules_path}"
+        
+        begin
+          gitmodules_content = File.read(gitmodules_path)
+          original_content = gitmodules_content.dup
+          
+          # Replace SSH URLs with HTTPS
+          gitmodules_content.gsub!(/git@github\.com:([^\/]+\/[^\/\s]+)(\.git)?/, 'https://github.com/\1')
+          gitmodules_content.gsub!(/ssh:\/\/git@github\.com\/([^\/\s]+)/, 'https://github.com/\1')
+          
+          if gitmodules_content != original_content
+            File.write(gitmodules_path, gitmodules_content)
+            puts "✅ [GitLFS] Converted SSH submodule URLs to HTTPS"
+            
+            # Show what we converted
+            original_content.each_line.with_index do |line, idx|
+              new_line = gitmodules_content.lines[idx]
+              if line != new_line && line.include?("url =")
+                puts "   [GitLFS] #{line.strip} → #{new_line.strip}"
+              end
+            end
+          else
+            puts "ℹ️  [GitLFS] No SSH URLs found in .gitmodules"
+          end
+        rescue => e
+          puts "⚠️  [GitLFS] Failed to process .gitmodules: #{e.message}"
+        end
+      else
+        puts "ℹ️  [GitLFS] No .gitmodules file found - no submodules to convert"
+      end
+      
     rescue => e
       puts "❌ [GitLFS] Download failed: #{e.message}"
       puts "🔍 [GitLFS] Current directory: #{Dir.pwd}"
