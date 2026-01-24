@@ -5,7 +5,7 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v0.3.34-alpha",
+      tag:      "v0.3.37-alpha",
       revision: "bf4dac3020ef49c536d728782e1c7a42cdbaf444",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
@@ -32,6 +32,32 @@ class Knoodle < Formula
     end
 
     ohai "Cloning repository and initializing submodules..."
+
+    # Fix SSH submodule URLs before initializing (essential for WSL2/systems without SSH keys)
+    if File.exist?(".gitmodules")
+      ohai "Converting SSH submodule URLs to HTTPS for universal compatibility..."
+
+      gitmodules_content = File.read(".gitmodules")
+      original_content = gitmodules_content.dup
+
+      # Convert SSH URLs to HTTPS
+      gitmodules_content.gsub!(%r{git@github\.com:([^/\s]+/[^/\s]+)}, 'https://github.com/\1')
+      gitmodules_content.gsub!(%r{ssh://git@github\.com/([^/\s]+)}, 'https://github.com/\1')
+
+      if gitmodules_content == original_content
+        puts "ℹ️  No SSH URLs found - no conversion needed"
+      else
+        File.write(".gitmodules", gitmodules_content)
+        puts "✅ Converted SSH URLs to HTTPS:"
+
+        # Show what we converted
+        original_content.each_line.with_index do |line, idx|
+          new_line = gitmodules_content.lines[idx]
+          puts "   #{line.strip} → #{new_line.strip}" if line != new_line && line.include?("url =")
+        end
+      end
+    end
+
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
 
     env :std
