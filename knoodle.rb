@@ -5,7 +5,7 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v0.3.28-alpha",
+      tag:      "v0.3.31-alpha",
       revision: "bf4dac3020ef49c536d728782e1c7a42cdbaf444",
       using:    GitLFSDownloadStrategy
   license "MIT"
@@ -33,34 +33,60 @@ class Knoodle < Formula
 
     ohai "Cloning repository and initializing submodules..."
 
+    # Enhanced debugging to see what's happening on different systems
+    puts "🔍 [DEBUG] Current working directory: #{Dir.pwd}"
+    puts "🔍 [DEBUG] Directory contents: #{Dir.entries(".").reject { |f| f.start_with?(".") }.sort}"
+    puts "🔍 [DEBUG] Operating system: #{OS.mac? ? "macOS" : "Linux"}"
+
     # Fix SSH submodule URLs before initializing (fixes WSL2/no SSH key systems)
     gitmodules_path = ".gitmodules"
+    puts "🔍 [DEBUG] Looking for .gitmodules file at: #{File.expand_path(gitmodules_path)}"
+    puts "🔍 [DEBUG] .gitmodules exists: #{File.exist?(gitmodules_path)}"
+
     if File.exist?(gitmodules_path)
       ohai "Converting SSH submodule URLs to HTTPS..."
+      puts "🔍 [DEBUG] Reading .gitmodules file..."
 
-      gitmodules_content = File.read(gitmodules_path)
-      original_content = gitmodules_content.dup
+      begin
+        gitmodules_content = File.read(gitmodules_path)
+        original_content = gitmodules_content.dup
+        puts "🔍 [DEBUG] .gitmodules content length: #{gitmodules_content.length} chars"
+        puts "🔍 [DEBUG] .gitmodules contains \"git@github.com\": #{gitmodules_content.include?("git@github.com")}"
 
-      # Replace SSH URLs with HTTPS
-      gitmodules_content.gsub!(%r{git@github\.com:([^/]+/[^/\s]+)(\.git)?}, 'https://github.com/\1')
-      gitmodules_content.gsub!(%r{ssh://git@github\.com/([^/\s]+)}, 'https://github.com/\1')
+        # Replace SSH URLs with HTTPS
+        gitmodules_content.gsub!(%r{git@github\.com:([^/]+/[^/\s]+)(\.git)?}, 'https://github.com/\1')
+        gitmodules_content.gsub!(%r{ssh://git@github\.com/([^/\s]+)}, 'https://github.com/\1')
 
-      if gitmodules_content == original_content
-        puts "ℹ️  No SSH URLs found - no conversion needed"
-      else
-        File.write(gitmodules_path, gitmodules_content)
-        ohai "✅ Converted SSH URLs to HTTPS in .gitmodules"
+        if gitmodules_content == original_content
+          puts "ℹ️  No SSH URLs found - no conversion needed"
+        else
+          puts "🔍 [DEBUG] Writing modified .gitmodules file..."
+          File.write(gitmodules_path, gitmodules_content)
+          ohai "✅ Converted SSH URLs to HTTPS in .gitmodules"
 
-        # Show conversions for debugging
-        original_content.each_line.with_index do |line, idx|
-          new_line = gitmodules_content.lines[idx]
-          puts "   #{line.strip} → #{new_line.strip}" if line != new_line && line.include?("url =")
+          # Show conversions for debugging
+          original_content.each_line.with_index do |line, idx|
+            new_line = gitmodules_content.lines[idx]
+            puts "   #{line.strip} → #{new_line.strip}" if line != new_line && line.include?("url =")
+          end
         end
+      rescue => e
+        puts "❌ [DEBUG] Error processing .gitmodules: #{e.message}"
+        puts "🔍 [DEBUG] Error details: #{e.class} - #{e.backtrace.first}"
       end
     else
-      puts "ℹ️  No .gitmodules file found"
+      puts "ℹ️  No .gitmodules file found at #{File.expand_path(gitmodules_path)}"
+      puts "🔍 [DEBUG] Searching for .gitmodules in parent directories..."
+      3.times do |i|
+        parent_path = File.join(".." * (i + 1), ".gitmodules")
+        if File.exist?(parent_path)
+          puts "🔍 [DEBUG] Found .gitmodules at: #{File.expand_path(parent_path)}"
+          break
+        end
+      end
     end
 
+    puts "🔍 [DEBUG] About to run: git submodule update --init --recursive --depth 1"
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
 
     env :std
