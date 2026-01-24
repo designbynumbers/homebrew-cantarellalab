@@ -5,7 +5,7 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v0.3.37-alpha",
+      tag:      "v0.3.40-alpha",
       revision: "bf4dac3020ef49c536d728782e1c7a42cdbaf444",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
@@ -38,6 +38,13 @@ class Knoodle < Formula
       ohai "Converting SSH submodule URLs to HTTPS for universal compatibility..."
 
       gitmodules_content = File.read(".gitmodules")
+
+      # DEBUG: Show what's actually in the file
+      puts "🔍 [DEBUG] .gitmodules content:"
+      gitmodules_content.lines.each_with_index do |line, idx|
+        puts "  #{idx + 1}: #{line}" if line.include?("url =")
+      end
+
       original_content = gitmodules_content.dup
 
       # Convert SSH URLs to HTTPS
@@ -56,6 +63,8 @@ class Knoodle < Formula
           puts "   #{line.strip} → #{new_line.strip}" if line != new_line && line.include?("url =")
         end
       end
+    else
+      puts "⚠️  .gitmodules file not found!"
     end
 
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
