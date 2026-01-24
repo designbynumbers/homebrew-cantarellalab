@@ -5,7 +5,7 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v0.3.40-alpha",
+      tag:      "v0.3.45-alpha",
       revision: "bf4dac3020ef49c536d728782e1c7a42cdbaf444",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
@@ -24,47 +24,48 @@ class Knoodle < Formula
   depends_on "suite-sparse"
 
   def install
-    # Warn users about potentially long compilation time
+    # Platform info
     if OS.linux?
       ohai "Linux detected: Building with system gcc for ecosystem compatibility"
       ohai "This installation may take 5-10 minutes (using standard packages)"
-      puts ""
     end
 
     ohai "Cloning repository and initializing submodules..."
 
-    # Fix SSH submodule URLs before initializing (essential for WSL2/systems without SSH keys)
+    # CRITICAL: Convert SSH submodule URLs to HTTPS before submodule init
+    # This is essential for WSL2, Docker, Linux VMs without SSH keys
     if File.exist?(".gitmodules")
       ohai "Converting SSH submodule URLs to HTTPS for universal compatibility..."
 
       gitmodules_content = File.read(".gitmodules")
 
-      # DEBUG: Show what's actually in the file
-      puts "🔍 [DEBUG] .gitmodules content:"
-      gitmodules_content.lines.each_with_index do |line, idx|
-        puts "  #{idx + 1}: #{line}" if line.include?("url =")
+      # Show current URLs
+      ohai "Current .gitmodules URLs:"
+      gitmodules_content.lines.each do |line|
+        puts "  #{line.strip}" if line.include?("url =")
       end
 
       original_content = gitmodules_content.dup
 
       # Convert SSH URLs to HTTPS
-      gitmodules_content.gsub!(%r{git@github\.com:([^/\s]+/[^/\s]+)}, 'https://github.com/\1')
-      gitmodules_content.gsub!(%r{ssh://git@github\.com/([^/\s]+)}, 'https://github.com/\1')
+      # Pattern 1: git@github.com:user/repo.git or git@github.com:user/repo
+      gitmodules_content.gsub!(%r{git@github\.com:([^/\s]+/[^/\s]+?)(\.git)?(\s*)$}m, 'https://github.com/\1\3')
+      # Pattern 2: ssh://git@github.com/user/repo.git or ssh://git@github.com/user/repo
+      gitmodules_content.gsub!(%r{ssh://git@github\.com/([^/\s]+/[^/\s]+?)(\.git)?(\s*)$}m, 'https://github.com/\1\3')
 
       if gitmodules_content == original_content
-        puts "ℹ️  No SSH URLs found - no conversion needed"
+        ohai "No SSH URLs found - no conversion needed"
       else
         File.write(".gitmodules", gitmodules_content)
-        puts "✅ Converted SSH URLs to HTTPS:"
-
-        # Show what we converted
-        original_content.each_line.with_index do |line, idx|
-          new_line = gitmodules_content.lines[idx]
-          puts "   #{line.strip} → #{new_line.strip}" if line != new_line && line.include?("url =")
+        ohai "Converted SSH URLs to HTTPS:"
+        gitmodules_content.lines.each do |line|
+          puts "  #{line.strip}" if line.include?("url =")
         end
+        # Sync changes to .git/config
+        system "git", "submodule", "sync"
       end
     else
-      puts "⚠️  .gitmodules file not found!"
+      ohai "No .gitmodules file found"
     end
 
     system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
@@ -74,13 +75,10 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
-    # Use system compilers (no special setup needed)
     if OS.mac?
-      # On macOS, use system clang
       ENV["CXX"] = ENV.cxx
       ENV["CC"] = ENV.cc
     end
-    # On Linux, just use default gcc (no special ENV setup needed)
 
     # Build and install PolyFold
     ohai "Building PolyFold (knot-tightening tool)..."

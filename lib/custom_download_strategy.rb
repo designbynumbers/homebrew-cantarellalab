@@ -1,17 +1,27 @@
 require "download_strategy"
 
+# Custom Git LFS download strategy for Knoodle
+# Handles LFS files and converts SSH submodule URLs to HTTPS for systems without SSH keys
 class KnoodleGitLFSDownloadStrategy < GitDownloadStrategy
+  
+  # Class constant to verify strategy is loaded
+  STRATEGY_VERSION = "2.0.0"
+  
+  def self.loaded?
+    true
+  end
+  
   def fetch(timeout: nil)
-    puts "🔍 [GitLFS] Starting download with custom strategy..."
+    ohai "[Knoodle] Custom download strategy v#{STRATEGY_VERSION} active"
+    ohai "[Knoodle] Starting Git LFS download..."
     
-    # Preserve user environment that Git LFS might need
+    # Preserve environment that Git LFS might need
     original_home = ENV["HOME"]
     original_user = ENV["USER"]
-    original_git_config = ENV.select { |k, v| k.start_with?("GIT_") }
+    original_git_config = ENV.select { |k, _v| k.start_with?("GIT_") }
     
     # Ensure Homebrew's bin directory is first in PATH
     ENV["PATH"] = "#{HOMEBREW_PREFIX}/bin:#{ENV["PATH"]}"
-    puts "🔍 [GitLFS] PATH set to: #{ENV["PATH"]}"
     
     # Restore important environment variables that might have been sanitized
     ENV["HOME"] = original_home if original_home
@@ -19,19 +29,27 @@ class KnoodleGitLFSDownloadStrategy < GitDownloadStrategy
     original_git_config.each { |k, v| ENV[k] = v }
     
     # Set up Git LFS environment explicitly
-    ENV["GIT_LFS_SKIP_SMUDGE"] = "1"  # Skip smudge initially, let git lfs pull handle it
+    # Skip smudge initially, let git lfs pull handle it after clone
+    ENV["GIT_LFS_SKIP_SMUDGE"] = "1"
     
-    puts "🔍 [GitLFS] Checking git-lfs availability..."
+    # Verify git-lfs is available
+    ohai "[Knoodle] Checking git-lfs availability..."
+    git_lfs_found = system("git", "lfs", "version", out: File::NULL, err: File::NULL)
     
-    # Verify git-lfs is available with more detailed check
-    unless system("git", "lfs", "version", out: File::NULL, err: File::NULL)
-      puts "❌ [GitLFS] git-lfs not found in PATH"
-      # Make error message more prominent with clear separation
-      puts "\n" + "="*60
-      puts "KNOODLE INSTALLATION REQUIRES GIT LFS"
-      puts "="*60
+    unless git_lfs_found
+      # Print diagnostic info before failing
+      opoo "[Knoodle] git-lfs not found! Diagnostic info:"
+      opoo "[Knoodle] PATH = #{ENV["PATH"]}"
+      opoo "[Knoodle] HOMEBREW_PREFIX = #{HOMEBREW_PREFIX}"
+      opoo "[Knoodle] which git-lfs = #{`which git-lfs 2>/dev/null`.strip}"
+      
       odie <<~EOS
-        Git LFS is required but not found. Please install it first:
+        
+        ================================================================
+        KNOODLE INSTALLATION REQUIRES GIT LFS
+        ================================================================
+        
+        Git LFS is required but was not found. Please install it first:
         
           brew install git-lfs
           git lfs install
@@ -40,63 +58,93 @@ class KnoodleGitLFSDownloadStrategy < GitDownloadStrategy
         
           brew install knoodle
         
-        (If you haven't added the tap yet, run: brew tap designbynumbers/cantarellalab)
+        If you haven't added the tap yet, run:
+          brew tap designbynumbers/cantarellalab
+        
       EOS
     end
     
-    puts "✅ [GitLFS] git-lfs found and working"
-    puts "🔍 [GitLFS] Calling parent Git download strategy..."
+    ohai "[Knoodle] git-lfs found and working"
+    ohai "[Knoodle] Calling parent Git download strategy..."
     
-    # Call the parent GitDownloadStrategy with timeout
+    # Call the parent GitDownloadStrategy
     begin
       super
-      puts "🔍 [GitLFS] Base git clone completed, now pulling LFS files..."
+      ohai "[Knoodle] Base git clone completed to: #{cached_location}"
       
-      # Explicitly pull LFS files after clone
-      system("git", "lfs", "pull", chdir: cached_location.to_s, 
-             exception: false, out: $stdout, err: $stderr)
-      puts "✅ [GitLFS] LFS files downloaded successfully"
-      
-      # CRITICAL: Fix SSH submodule URLs immediately after clone, before any submodule operations
-      puts "🔍 [GitLFS] Checking for SSH submodules to convert to HTTPS..."
-      gitmodules_path = File.join(cached_location.to_s, ".gitmodules")
-      if File.exist?(gitmodules_path)
-        puts "🔍 [GitLFS] Found .gitmodules at: #{gitmodules_path}"
-        
-        begin
-          gitmodules_content = File.read(gitmodules_path)
-          original_content = gitmodules_content.dup
-          
-          # Replace SSH URLs with HTTPS
-          gitmodules_content.gsub!(/git@github\.com:([^\/]+\/[^\/\s]+)(\.git)?/, 'https://github.com/\1')
-          gitmodules_content.gsub!(/ssh:\/\/git@github\.com\/([^\/\s]+)/, 'https://github.com/\1')
-          
-          if gitmodules_content != original_content
-            File.write(gitmodules_path, gitmodules_content)
-            puts "✅ [GitLFS] Converted SSH submodule URLs to HTTPS"
-            
-            # Show what we converted
-            original_content.each_line.with_index do |line, idx|
-              new_line = gitmodules_content.lines[idx]
-              if line != new_line && line.include?("url =")
-                puts "   [GitLFS] #{line.strip} → #{new_line.strip}"
-              end
-            end
-          else
-            puts "ℹ️  [GitLFS] No SSH URLs found in .gitmodules"
-          end
-        rescue => e
-          puts "⚠️  [GitLFS] Failed to process .gitmodules: #{e.message}"
-        end
-      else
-        puts "ℹ️  [GitLFS] No .gitmodules file found - no submodules to convert"
+      # Pull LFS files explicitly after clone
+      ohai "[Knoodle] Pulling LFS files..."
+      Dir.chdir(cached_location.to_s) do
+        system("git", "lfs", "pull")
       end
+      ohai "[Knoodle] LFS files downloaded"
+      
+      # Convert SSH submodule URLs to HTTPS
+      # This is critical for WSL2/Linux systems without GitHub SSH keys
+      convert_ssh_to_https_in_gitmodules(cached_location.to_s)
       
     rescue => e
-      puts "❌ [GitLFS] Download failed: #{e.message}"
-      puts "🔍 [GitLFS] Current directory: #{Dir.pwd}"
-      puts "🔍 [GitLFS] Cached location: #{cached_location}"
+      opoo "[Knoodle] Download failed: #{e.message}"
+      opoo "[Knoodle] Cached location: #{cached_location}"
       raise
+    end
+  end
+  
+  private
+  
+  # Convert SSH URLs to HTTPS in .gitmodules file
+  # This allows submodule cloning to work without SSH keys
+  def convert_ssh_to_https_in_gitmodules(repo_path)
+    gitmodules_path = File.join(repo_path, ".gitmodules")
+    
+    unless File.exist?(gitmodules_path)
+      ohai "[Knoodle] No .gitmodules file found - no submodules to convert"
+      return
+    end
+    
+    ohai "[Knoodle] Converting SSH submodule URLs to HTTPS..."
+    
+    begin
+      gitmodules_content = File.read(gitmodules_path)
+      original_content = gitmodules_content.dup
+      
+      # Log what URLs we're starting with
+      original_content.each_line do |line|
+        ohai "[Knoodle] Found: #{line.strip}" if line.include?("url =")
+      end
+      
+      # Pattern 1: git@github.com:user/repo.git or git@github.com:user/repo
+      # Captures: user/repo (with optional .git)
+      gitmodules_content.gsub!(
+        %r{git@github\.com:([^/\s]+/[^/\s]+?)(\.git)?(\s|$)},
+        'https://github.com/\1\3'
+      )
+      
+      # Pattern 2: ssh://git@github.com/user/repo.git or ssh://git@github.com/user/repo
+      # Note: This pattern correctly captures user/repo (two path components)
+      gitmodules_content.gsub!(
+        %r{ssh://git@github\.com/([^/\s]+/[^/\s]+?)(\.git)?(\s|$)},
+        'https://github.com/\1\3'
+      )
+      
+      if gitmodules_content != original_content
+        File.write(gitmodules_path, gitmodules_content)
+        ohai "[Knoodle] Converted SSH URLs to HTTPS:"
+        
+        # Show the conversions
+        original_content.each_line.with_index do |line, idx|
+          new_line = gitmodules_content.lines[idx]
+          if line != new_line && line.include?("url =")
+            ohai "[Knoodle]   #{line.strip}"
+            ohai "[Knoodle]   => #{new_line&.strip}"
+          end
+        end
+      else
+        ohai "[Knoodle] No SSH URLs found in .gitmodules (already HTTPS or no submodules)"
+      end
+    rescue => e
+      opoo "[Knoodle] Failed to process .gitmodules: #{e.message}"
+      opoo "[Knoodle] Submodule cloning may fail if SSH keys aren't configured"
     end
   end
 end
