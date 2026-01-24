@@ -1,6 +1,6 @@
 require "download_strategy"
 
-class GitLFSDownloadStrategy < GitDownloadStrategy
+class KnoodleGitLFSDownloadStrategy < GitDownloadStrategy
   def fetch(timeout: nil)
     puts "🔍 [GitLFS] Starting download with custom strategy..."
     
