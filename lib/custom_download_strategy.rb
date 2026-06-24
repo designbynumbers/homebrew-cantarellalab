@@ -102,6 +102,14 @@ class KnoodleGitLFSDownloadStrategy < GitDownloadStrategy
       opoo "[Knoodle] Download failed: #{e.message}"
       opoo "[Knoodle] Cached location: #{cached_location}"
       raise
+    ensure
+      # Drop the temporary SSH->HTTPS rewrite so it cannot leak into Homebrew's
+      # build phase. The build sandbox keeps GIT_CONFIG_COUNT but strips the
+      # GIT_CONFIG_KEY_*/VALUE_* vars, which makes later git calls fail with
+      # "missing config key GIT_CONFIG_KEY_0". By now .gitmodules is already
+      # rewritten to HTTPS (and submodules are cloned), so the rule isn't needed.
+      %w[GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+         GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1].each { |k| ENV.delete(k) }
     end
   end
   

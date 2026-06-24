@@ -72,15 +72,9 @@ jobs:
           # (submodule/LFS clone logic) so changing either re-clones from scratch.
           key: ${{ matrix.os }}-knoodle-src-${{ hashFiles('knoodle.rb', 'lib/custom_download_strategy.rb') }}
 
-      # setup-homebrew already taps this repo (from the remote default branch).
-      # Overwrite that clone with the checked-out tree so we test THIS commit's
-      # formula — important for pull requests, whose changes aren't on main yet.
-      - name: Point the tap at this checkout
-        run: |
-          TAP_DIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
-          rm -rf "$TAP_DIR"
-          mkdir -p "$TAP_DIR"
-          cp -R "$GITHUB_WORKSPACE/." "$TAP_DIR/"
+      # No manual tap step: setup-homebrew already symlinks this checkout in as
+      # the designbynumbers/cantarellalab tap, so the formula under test is this
+      # commit's (PR-aware), and we avoid clobbering that symlink.
 
       - name: Audit formula
         run: brew audit --strict designbynumbers/cantarellalab/knoodle
