@@ -1,0 +1,83 @@
+name: tests
+
+# Build-from-source install test for the cantarellalab tap formulae.
+#
+# Why not the stock `brew test-bot` template? test-bot only tests formulae that
+# changed in the diff and is bottle-oriented. knoodle disables bottles
+# (-march=native) and we bump the formula directly on main, so an explicit
+# tap -> audit -> install --build-from-source -> test is clearer and actually
+# runs on every formula change. Uses Homebrew's official setup-homebrew action,
+# so it's free on GitHub-hosted runners as long as this repo stays public.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 1st of each month, 07:00 UTC: catch breakage from upstream Homebrew
+    # dependency bumps (boost / suite-sparse / clp / metis) before a user hits it.
+    # Monthly (not weekly) to keep Git LFS bandwidth on the source repo low.
+    - cron: "0 7 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  knoodle:
+    name: knoodle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest => Linuxbrew (also the closest proxy for WSL2/Ubuntu).
+        # macos-latest  => clean-room macOS, catches "works because it's already
+        #                  installed on my laptop" dependency gaps.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out tap
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Homebrew Bundler RubyGems
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+          key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+          restore-keys: ${{ matrix.os }}-rubygems-
+
+      - name: Locate Homebrew download cache
+        run: echo "BREW_CACHE=$(brew --cache)" >> "$GITHUB_ENV"
+
+      # Knoodle is a Git-LFS repo (~100+ MB of objects). LFS bandwidth bills to
+      # the SOURCE repo's owner (HenrikSchumacher/Knoodle), not this tap, and the
+      # free tier is only 1 GB/month. Cache the cloned source keyed on the pinned
+      # revision so LFS is pulled once per release; weekly/re-runs hit the cache.
+      # No restore-keys on purpose: a clone from a *different* revision would
+      # trip Homebrew's tag/revision check, so we only accept an exact-revision hit.
+      - name: Cache knoodle source clone (avoid re-pulling Git LFS)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BREW_CACHE }}/knoodle--git
+          key: ${{ matrix.os }}-knoodle-src-${{ hashFiles('knoodle.rb') }}
+
+      - name: Tap this repository (from the checkout)
+        run: brew tap designbynumbers/cantarellalab "$GITHUB_WORKSPACE"
+
+      - name: Audit formula
+        run: brew audit --strict designbynumbers/cantarellalab/knoodle
+
+      - name: Install knoodle (build from source)
+        run: brew install --build-from-source --verbose designbynumbers/cantarellalab/knoodle
+
+      - name: Run the formula test block
+        run: brew test --verbose designbynumbers/cantarellalab/knoodle
