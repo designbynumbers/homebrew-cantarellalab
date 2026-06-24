@@ -1,12 +1,12 @@
 require_relative "lib/custom_download_strategy"
 
 class Knoodle < Formula
-  desc "Computational knot theory library with PolyFold and KnoodleTool"
+  desc "Computational knot theory library with PolyFold and the knoodle tools"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v0.3.45-alpha",
-      revision: "bf4dac3020ef49c536d728782e1c7a42cdbaf444",
+      tag:      "v1.0.0",
+      revision: "9e68016883a38c8d488e81199ae0569155aaff8f",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
 
@@ -87,9 +87,10 @@ class Knoodle < Formula
       system "make", "install", "PREFIX=#{prefix}"
     end
 
-    # Build and install KnoodleTool
-    ohai "Building KnoodleTool (knot theory utilities)..."
-    cd "KnoodleTool" do
+    # Build and install the knoodle command-line tools
+    # (knoodlesimplify, knoodledraw, knoodleidentify)
+    ohai "Building knoodle tools (simplify / draw / identify)..."
+    cd "tools" do
       system "make"
       system "make", "install", "PREFIX=#{prefix}"
     end
@@ -101,7 +102,9 @@ class Knoodle < Formula
 
     ohai "Installation complete!"
     puts "Test with: #{bin}/polyfold --help"
-    puts "           #{bin}/knoodletool --help"
+    puts "           #{bin}/knoodlesimplify --help"
+    puts "           #{bin}/knoodledraw --help"
+    puts "           #{bin}/knoodleidentify --help"
   end
 
   def caveats
@@ -124,13 +127,15 @@ class Knoodle < Formula
 
         brew install knoodle
 
-      Knoodle has been installed with both tools optimized for #{os_name} using #{compiler_info}:
+      Knoodle has been installed with all tools optimized for #{os_name} using #{compiler_info}:
 
       PolyFold (knot-tightening):
         #{bin}/polyfold
 
-      KnoodleTool (knot theory utilities):
-        #{bin}/knoodletool
+      knoodle tools (knot theory utilities):
+        #{bin}/knoodlesimplify   simplify knot/link diagrams to PD codes
+        #{bin}/knoodledraw       render diagrams as ASCII/Unicode art
+        #{bin}/knoodleidentify   identify knot types via the KLUT
 
       Note: On Linux, this formula uses system gcc for compatibility with standard
       Homebrew packages, providing fast installation with CPU-specific optimizations.
@@ -142,6 +147,8 @@ class Knoodle < Formula
 
   test do
     system "#{bin}/polyfold", "--help"
-    system "#{bin}/knoodletool", "--help"
+    system "#{bin}/knoodlesimplify", "--help"
+    system "#{bin}/knoodledraw", "--help"
+    system "#{bin}/knoodleidentify", "--help"
   end
 end
