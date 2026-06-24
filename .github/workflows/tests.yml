@@ -68,7 +68,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.BREW_CACHE }}/knoodle--git
-          key: ${{ matrix.os }}-knoodle-src-${{ hashFiles('knoodle.rb') }}
+          # Key on both the formula (pinned revision) and the download strategy
+          # (submodule/LFS clone logic) so changing either re-clones from scratch.
+          key: ${{ matrix.os }}-knoodle-src-${{ hashFiles('knoodle.rb', 'lib/custom_download_strategy.rb') }}
 
       # setup-homebrew already taps this repo (from the remote default branch).
       # Overwrite that clone with the checked-out tree so we test THIS commit's

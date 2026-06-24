@@ -31,6 +31,21 @@ class KnoodleGitLFSDownloadStrategy < GitDownloadStrategy
     # Set up Git LFS environment explicitly
     # Skip smudge initially, let git lfs pull handle it after clone
     ENV["GIT_LFS_SKIP_SMUDGE"] = "1"
+
+    # Rewrite SSH submodule URLs (git@github.com:...) to HTTPS for this download.
+    # Knoodle's .gitmodules uses SSH URLs, and the parent GitDownloadStrategy runs
+    # `git submodule update --init --recursive` inside `super` BELOW -- before the
+    # .gitmodules rewrite in convert_ssh_to_https_in_gitmodules ever runs. On a
+    # keyless machine (CI, or a fresh WSL2/Linux box without GitHub SSH keys) that
+    # parent submodule clone fails with "Permission denied (publickey)". Injecting
+    # an insteadOf rule via GIT_CONFIG_* env vars (git >= 2.31) makes every git
+    # invocation here -- including the parent's recursive submodule clone -- use
+    # HTTPS, with no global git config changes on the user's machine.
+    ENV["GIT_CONFIG_COUNT"]   = "2"
+    ENV["GIT_CONFIG_KEY_0"]   = "url.https://github.com/.insteadOf"
+    ENV["GIT_CONFIG_VALUE_0"] = "git@github.com:"
+    ENV["GIT_CONFIG_KEY_1"]   = "url.https://github.com/.insteadOf"
+    ENV["GIT_CONFIG_VALUE_1"] = "ssh://git@github.com/"
     
     # Verify git-lfs is available
     ohai "[Knoodle] Checking git-lfs availability..."
