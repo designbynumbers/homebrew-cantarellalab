@@ -6,7 +6,7 @@ class Knoodle < Formula
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
       tag:      "v1.0.0",
-      revision: "9e68016883a38c8d488e81199ae0569155aaff8f",
+      revision: "af06d59ceba059ed24c54f5f27ab6f6e4e8c2c67",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
 
@@ -146,7 +146,12 @@ class Knoodle < Formula
   end
 
   test do
-    system "#{bin}/polyfold", "--help"
+    # polyfold returns non-zero after printing `--help` (a known issue), so we
+    # exercise a real sampler run instead: generate a couple of 8-edge samples
+    # with the squared-gyradius statistic and confirm it writes its report.
+    system "#{bin}/polyfold", "-n", "8", "-N", "2", "-b", "2", "-s", "1", "-g", "-o", testpath
+    assert_path_exists testpath/"Info.m"
+
     system "#{bin}/knoodlesimplify", "--help"
     system "#{bin}/knoodledraw", "--help"
     system "#{bin}/knoodleidentify", "--help"
