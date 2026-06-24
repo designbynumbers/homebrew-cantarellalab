@@ -70,8 +70,15 @@ jobs:
           path: ${{ env.BREW_CACHE }}/knoodle--git
           key: ${{ matrix.os }}-knoodle-src-${{ hashFiles('knoodle.rb') }}
 
-      - name: Tap this repository (from the checkout)
-        run: brew tap designbynumbers/cantarellalab "$GITHUB_WORKSPACE"
+      # setup-homebrew already taps this repo (from the remote default branch).
+      # Overwrite that clone with the checked-out tree so we test THIS commit's
+      # formula — important for pull requests, whose changes aren't on main yet.
+      - name: Point the tap at this checkout
+        run: |
+          TAP_DIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
+          rm -rf "$TAP_DIR"
+          mkdir -p "$TAP_DIR"
+          cp -R "$GITHUB_WORKSPACE/." "$TAP_DIR/"
 
       - name: Audit formula
         run: brew audit --strict designbynumbers/cantarellalab/knoodle
