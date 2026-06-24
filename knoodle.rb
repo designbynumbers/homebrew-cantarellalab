@@ -5,8 +5,8 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v1.0.0",
-      revision: "af06d59ceba059ed24c54f5f27ab6f6e4e8c2c67",
+      tag:      "v1.0.1",
+      revision: "846b345faecd2362fd545fbd45e30bb9b226db55",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
 
