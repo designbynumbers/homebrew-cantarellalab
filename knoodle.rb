@@ -5,8 +5,8 @@ class Knoodle < Formula
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v1.0.0",
-      revision: "af06d59ceba059ed24c54f5f27ab6f6e4e8c2c67",
+      tag:      "v1.0.1",
+      revision: "8ed1c3fa3b8d59015053fb50d290a0f7343a2eb9",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
 
@@ -23,11 +23,19 @@ class Knoodle < Formula
   depends_on "metis"
   depends_on "suite-sparse"
 
+  # Build with Homebrew's recent gcc on Linux instead of the system g++. The
+  # system gcc on the runner (13/14) trips a function_traits<bool*> instantiation
+  # in PolyFold that newer gcc (15/16, which builds fine on Henrik's machine)
+  # may not. See HenrikSchumacher/Knoodle#15.
+  on_linux do
+    depends_on "gcc"
+  end
+
   def install
     # Platform info
     if OS.linux?
-      ohai "Linux detected: Building with system gcc for ecosystem compatibility"
-      ohai "This installation may take 5-10 minutes (using standard packages)"
+      ohai "Linux detected: building with Homebrew gcc for a recent C++ toolchain"
+      ohai "This installation may take 5-10 minutes"
     end
 
     ohai "Cloning repository and initializing submodules..."
@@ -75,24 +83,37 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
+    # The makefiles hardcode `CXX = g++` on Linux, so the compiler must be
+    # overridden on the make command line (not via ENV). On Linux, point it at
+    # Homebrew's gcc (g++-NN); on macOS keep the configured clang.
+    make_args = []
     if OS.mac?
       ENV["CXX"] = ENV.cxx
       ENV["CC"] = ENV.cc
+    else
+      gcc = Formula["gcc"]
+      ver = gcc.version.major
+      # System gcc 13/14 on the runner hits a function_traits<bool*> error in
+      # PolyFold that Homebrew gcc 16 doesn't. (Henrik fixed the separate gcc-16
+      # -Wchanges-meaning issue in 8ed1c3f, so no suppression flag is needed.)
+      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver}"
+      make_args << "CC=#{gcc.opt_bin}/gcc-#{ver}"
+      ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
     end
 
     # Build and install PolyFold
     ohai "Building PolyFold (knot-tightening tool)..."
     cd "PolyFold" do
-      system "make"
-      system "make", "install", "PREFIX=#{prefix}"
+      system "make", *make_args
+      system "make", "install", "PREFIX=#{prefix}", *make_args
     end
 
     # Build and install the knoodle command-line tools
     # (knoodlesimplify, knoodledraw, knoodleidentify)
     ohai "Building knoodle tools (simplify / draw / identify)..."
     cd "tools" do
-      system "make"
-      system "make", "install", "PREFIX=#{prefix}"
+      system "make", *make_args
+      system "make", "install", "PREFIX=#{prefix}", *make_args
     end
 
     ohai "Installing headers and documentation..."
@@ -110,9 +131,9 @@ class Knoodle < Formula
   def caveats
     os_name = OS.mac? ? "macOS" : "Linux"
     compiler_info = if OS.linux?
-      "system gcc for ecosystem compatibility"
+      "Homebrew gcc"
     else
-      "system clang"
+      "the system clang"
     end
 
     <<~EOS
@@ -137,8 +158,10 @@ class Knoodle < Formula
         #{bin}/knoodledraw       render diagrams as ASCII/Unicode art
         #{bin}/knoodleidentify   identify knot types via the KLUT
 
-      Note: On Linux, this formula uses system gcc for compatibility with standard
-      Homebrew packages, providing fast installation with CPU-specific optimizations.
+      Note: On Linux this formula builds with Homebrew's gcc (a recent C++ toolchain
+      is required). On macOS a recent Apple Clang / libc++ is required: older macOS
+      and Xcode (roughly macOS 15 / Clang 17 and earlier) are NOT supported, because
+      the build needs the floating-point std::from_chars from a newer libc++.
 
       Header files have been installed to:
         #{include}/knoodle/
