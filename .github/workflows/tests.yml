@@ -33,11 +33,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-latest => Linuxbrew (also the closest proxy for WSL2/Ubuntu).
-        # macos-latest  => clean-room macOS, catches "works because it's already
-        #                  installed on my laptop" dependency gaps.
-        os: [ubuntu-latest, macos-latest]
+        # Pinned (not *-latest) for reproducibility: the floating macos-latest
+        # label silently changed toolchains mid-migration and masked a bug.
+        #   ubuntu-24.04 => Linuxbrew (also the WSL2/Ubuntu proxy)
+        #   macos-26     => supported macOS toolchain (recent Apple Clang/libc++)
+        os: [ubuntu-24.04, macos-26]
+        include:
+          # Informational: macOS 15 / Clang 17 lacks floating-point
+          # std::from_chars, so the build is expected to fail there. This leg
+          # documents the unsupported boundary and acts as a tripwire if the
+          # upstream code ever gains a fallback; it does not fail the workflow.
+          - os: macos-15
+            experimental: true
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental == true }}
     steps:
       - name: Check out tap
         uses: actions/checkout@v4

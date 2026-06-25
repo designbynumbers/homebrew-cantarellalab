@@ -34,8 +34,8 @@ class Knoodle < Formula
   def install
     # Platform info
     if OS.linux?
-      ohai "Linux detected: Building with system gcc for ecosystem compatibility"
-      ohai "This installation may take 5-10 minutes (using standard packages)"
+      ohai "Linux detected: building with Homebrew gcc for a recent C++ toolchain"
+      ohai "This installation may take 5-10 minutes"
     end
 
     ohai "Cloning repository and initializing submodules..."
@@ -131,9 +131,9 @@ class Knoodle < Formula
   def caveats
     os_name = OS.mac? ? "macOS" : "Linux"
     compiler_info = if OS.linux?
-      "system gcc for ecosystem compatibility"
+      "Homebrew gcc"
     else
-      "system clang"
+      "the system clang"
     end
 
     <<~EOS
@@ -158,8 +158,10 @@ class Knoodle < Formula
         #{bin}/knoodledraw       render diagrams as ASCII/Unicode art
         #{bin}/knoodleidentify   identify knot types via the KLUT
 
-      Note: On Linux, this formula uses system gcc for compatibility with standard
-      Homebrew packages, providing fast installation with CPU-specific optimizations.
+      Note: On Linux this formula builds with Homebrew's gcc (a recent C++ toolchain
+      is required). On macOS a recent Apple Clang / libc++ is required: older macOS
+      and Xcode (roughly macOS 15 / Clang 17 and earlier) are NOT supported, because
+      the build needs the floating-point std::from_chars from a newer libc++.
 
       Header files have been installed to:
         #{include}/knoodle/
