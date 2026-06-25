@@ -23,9 +23,13 @@ class Knoodle < Formula
   depends_on "metis"
   depends_on "suite-sparse"
 
-  # EXPERIMENT (HenrikSchumacher/Knoodle#15): testing whether 8ed1c3f builds with
-  # the runner's *system* g++ (13/14). If it still hits function_traits<bool*>,
-  # restore `on_linux do depends_on "gcc" end` and the gcc-16 CXX override below.
+  # Build with Homebrew's recent gcc on Linux instead of the system g++. The
+  # system gcc on the runner (13/14) trips a function_traits<bool*> instantiation
+  # in PolyFold that newer gcc (15/16, which builds fine on Henrik's machine)
+  # may not. See HenrikSchumacher/Knoodle#15.
+  on_linux do
+    depends_on "gcc"
+  end
 
   def install
     # Platform info
@@ -79,15 +83,23 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
+    # The makefiles hardcode `CXX = g++` on Linux, so the compiler must be
+    # overridden on the make command line (not via ENV). On Linux, point it at
+    # Homebrew's gcc (g++-NN); on macOS keep the configured clang.
     make_args = []
     if OS.mac?
       ENV["CXX"] = ENV.cxx
       ENV["CC"] = ENV.cc
+    else
+      gcc = Formula["gcc"]
+      ver = gcc.version.major
+      # System gcc 13/14 on the runner hits a function_traits<bool*> error in
+      # PolyFold that Homebrew gcc 16 doesn't. (Henrik fixed the separate gcc-16
+      # -Wchanges-meaning issue in 8ed1c3f, so no suppression flag is needed.)
+      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver}"
+      make_args << "CC=#{gcc.opt_bin}/gcc-#{ver}"
+      ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
     end
-    # Linux: EXPERIMENT (#15) — no CXX override, so the makefile uses the system
-    # g++ (gcc 13/14 on ubuntu-latest). Tests whether the gcc-13 function_traits
-    # <bool*> path still fails at 8ed1c3f. If it does, restore the Homebrew gcc-16
-    # override: gcc = Formula["gcc"]; make_args << "CXX=#{...}/g++-#{ver}" etc.
 
     # Build and install PolyFold
     ohai "Building PolyFold (knot-tightening tool)..."
