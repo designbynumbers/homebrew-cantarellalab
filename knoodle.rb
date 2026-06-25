@@ -6,7 +6,7 @@ class Knoodle < Formula
 
   url "https://github.com/HenrikSchumacher/Knoodle.git",
       tag:      "v1.0.1",
-      revision: "846b345faecd2362fd545fbd45e30bb9b226db55",
+      revision: "8ed1c3fa3b8d59015053fb50d290a0f7343a2eb9",
       using:    KnoodleGitLFSDownloadStrategy
   license "MIT"
 
@@ -93,10 +93,10 @@ class Knoodle < Formula
     else
       gcc = Formula["gcc"]
       ver = gcc.version.major
-      # gcc 16 rejects PassSimplifier (member fn vs class template) under the new
-      # [-Wchanges-meaning] diagnostic; suppress it. (The makefile hard-assigns
-      # CXXFLAGS on Linux, so we ride the extra flag on CXX rather than clobber it.)
-      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver} -Wno-changes-meaning"
+      # System gcc 13/14 on the runner hits a function_traits<bool*> error in
+      # PolyFold that Homebrew gcc 16 doesn't. (Henrik fixed the separate gcc-16
+      # -Wchanges-meaning issue in 8ed1c3f, so no suppression flag is needed.)
+      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver}"
       make_args << "CC=#{gcc.opt_bin}/gcc-#{ver}"
       ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
     end
