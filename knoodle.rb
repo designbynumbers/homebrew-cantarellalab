@@ -93,7 +93,10 @@ class Knoodle < Formula
     else
       gcc = Formula["gcc"]
       ver = gcc.version.major
-      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver}"
+      # gcc 16 rejects PassSimplifier (member fn vs class template) under the new
+      # [-Wchanges-meaning] diagnostic; suppress it. (The makefile hard-assigns
+      # CXXFLAGS on Linux, so we ride the extra flag on CXX rather than clobber it.)
+      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver} -Wno-changes-meaning"
       make_args << "CC=#{gcc.opt_bin}/gcc-#{ver}"
       ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
     end
