@@ -23,6 +23,14 @@ class Knoodle < Formula
   depends_on "metis"
   depends_on "suite-sparse"
 
+  # Build with Homebrew's recent gcc on Linux instead of the system g++. The
+  # system gcc on the runner (13/14) trips a function_traits<bool*> instantiation
+  # in PolyFold that newer gcc (15/16, which builds fine on Henrik's machine)
+  # may not. See HenrikSchumacher/Knoodle#15.
+  on_linux do
+    depends_on "gcc"
+  end
+
   def install
     # Platform info
     if OS.linux?
@@ -75,24 +83,34 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
+    # The makefiles hardcode `CXX = g++` on Linux, so the compiler must be
+    # overridden on the make command line (not via ENV). On Linux, point it at
+    # Homebrew's gcc (g++-NN); on macOS keep the configured clang.
+    make_args = []
     if OS.mac?
       ENV["CXX"] = ENV.cxx
       ENV["CC"] = ENV.cc
+    else
+      gcc = Formula["gcc"]
+      ver = gcc.version.major
+      make_args << "CXX=#{gcc.opt_bin}/g++-#{ver}"
+      make_args << "CC=#{gcc.opt_bin}/gcc-#{ver}"
+      ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
     end
 
     # Build and install PolyFold
     ohai "Building PolyFold (knot-tightening tool)..."
     cd "PolyFold" do
-      system "make"
-      system "make", "install", "PREFIX=#{prefix}"
+      system "make", *make_args
+      system "make", "install", "PREFIX=#{prefix}", *make_args
     end
 
     # Build and install the knoodle command-line tools
     # (knoodlesimplify, knoodledraw, knoodleidentify)
     ohai "Building knoodle tools (simplify / draw / identify)..."
     cd "tools" do
-      system "make"
-      system "make", "install", "PREFIX=#{prefix}"
+      system "make", *make_args
+      system "make", "install", "PREFIX=#{prefix}", *make_args
     end
 
     ohai "Installing headers and documentation..."
