@@ -105,15 +105,14 @@ jobs:
   #   fedora:latest => Tier 1 (recent glibc, uses system glibc like Ubuntu)
   #   rockylinux:9  => Tier 2 (glibc 2.34 -> Homebrew bootstraps its own glibc 2.39
   #                    + gcc); proxy for the UGA Sapelo2 cluster (Rocky 9.5).
-  # continue-on-error while we shake out the container path -- promote to a required
-  # leg (drop continue-on-error) once consistently green so failures email the
-  # maintainer. Skipped on pull_request to spare Git-LFS bandwidth on the source
-  # repo: we bump the formula on main, so push/cron/dispatch coverage is enough.
+  # Required leg (validated locally + on x86 CI): a break fails the run and emails
+  # the maintainer -- early warning before a Fedora user or the Sapelo2 cluster
+  # hits it. Skipped on pull_request to spare Git-LFS bandwidth on the source repo:
+  # we bump the formula on main, so push/cron/dispatch coverage is enough.
   knoodle-rpm:
     name: knoodle (${{ matrix.container }})
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
