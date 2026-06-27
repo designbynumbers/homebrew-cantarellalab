@@ -126,14 +126,19 @@ jobs:
     steps:
       - name: Install prerequisites (dnf)
         # Tools the Ubuntu runner ships preinstalled but a bare RPM image lacks.
-        # --allowerasing: RHEL-family minimal images ship curl-minimal, which
-        # conflicts with full curl; this lets dnf swap it. No-op on Fedora.
-        # git-lfs is intentionally NOT installed here (not in Rocky 9 base repos);
-        # we use Homebrew's git-lfs below, matching the documented user flow.
+        # Deliberately NOT installed:
+        #   curl  -- the base images already ship curl-minimal (provides curl);
+        #            installing full curl conflicts with it, and the --allowerasing
+        #            workaround is rejected by Fedora's dnf5 ("Unknown argument").
+        #   git-lfs -- not in Rocky 9 base repos; we use Homebrew's git-lfs below,
+        #            matching the documented user flow.
+        # `which` is best-effort: newest Fedora drops the package (brew uses
+        # command -v), while Rocky 9 still provides it.
         run: |
-          dnf -y --allowerasing install \
-            gcc gcc-c++ make git procps-ng file which curl tar gzip \
+          dnf -y install \
+            gcc gcc-c++ make git procps-ng file tar gzip \
             findutils sudo util-linux diffutils
+          dnf -y install which || true
 
       - name: Create non-root Homebrew user
         # Homebrew refuses to run as root; its installer also calls sudo (chown),
