@@ -101,19 +101,36 @@ class Knoodle < Formula
       ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
     end
 
-    # Build and install PolyFold
-    ohai "Building PolyFold (knot-tightening tool)..."
-    cd "PolyFold" do
-      system "make", *make_args
-      system "make", "install", "PREFIX=#{prefix}", *make_args
+    # Low-memory guard. Each binary is a single huge -O3 -march=native C++20
+    # translation unit over heavily-templated headers (Tensors, MCFClass, Boost),
+    # so one g++ process can need several GB of RAM. WSL2 defaults to ~50% of host
+    # RAM, so a modest laptop can OOM-kill cc1plus mid-compile -- a failure CI's
+    # 16 GB runners never see. Warn up front when available memory looks tight.
+    if OS.linux? && (avail_gb = available_memory_gb) && avail_gb < 4.0
+      opoo format("Only %.1f GB of RAM is available.", avail_gb)
+      opoo "This build compiles each tool as one large g++ process and may be"
+      opoo "OOM-killed. If it fails, see the memory guidance printed below."
     end
 
-    # Build and install the knoodle command-line tools
-    # (knoodlesimplify, knoodledraw, knoodleidentify)
-    ohai "Building knoodle tools (simplify / draw / identify)..."
-    cd "tools" do
-      system "make", *make_args
-      system "make", "install", "PREFIX=#{prefix}", *make_args
+    # Build and install PolyFold, then the knoodle command-line tools
+    # (knoodlesimplify, knoodledraw, knoodleidentify). On Linux a killed compiler
+    # is almost always an out-of-memory kill, so add memory guidance to any build
+    # failure before letting Homebrew's error propagate.
+    begin
+      ohai "Building PolyFold (knot-tightening tool)..."
+      cd "PolyFold" do
+        system "make", *make_args
+        system "make", "install", "PREFIX=#{prefix}", *make_args
+      end
+
+      ohai "Building knoodle tools (simplify / draw / identify)..."
+      cd "tools" do
+        system "make", *make_args
+        system "make", "install", "PREFIX=#{prefix}", *make_args
+      end
+    rescue
+      opoo oom_guidance if OS.linux?
+      raise
     end
 
     ohai "Installing headers and documentation..."
@@ -135,6 +152,14 @@ class Knoodle < Formula
     else
       "the system clang"
     end
+    linux_note =
+      if wsl?
+        "\n#{wsl_caveat}\n"
+      elsif OS.linux?
+        "\n#{memory_caveat}\n"
+      else
+        ""
+      end
 
     <<~EOS
       IMPORTANT: This formula requires Git LFS to clone the repository.
@@ -165,7 +190,75 @@ class Knoodle < Formula
 
       Header files have been installed to:
         #{include}/knoodle/
+      #{linux_note}
     EOS
+  end
+
+  # WSL2 defaults to ~50% of host RAM, which can be too little for this
+  # template-heavy build. True when running under WSL (WSL2 or WSL1).
+  def wsl?
+    OS.linux? && (ENV["WSL_DISTRO_NAME"].to_s != "" ||
+      (File.readable?("/proc/version") &&
+       File.read("/proc/version").match?(/microsoft|WSL/i)))
+  end
+
+  # MemAvailable from /proc/meminfo, in GiB, or nil if it can't be read.
+  def available_memory_gb
+    return unless File.readable?("/proc/meminfo")
+
+    kb = File.read("/proc/meminfo")[/^MemAvailable:\s+(\d+)/, 1].to_i
+    kb.positive? ? kb / 1024.0 / 1024.0 : nil
+  end
+
+  # Shown after a successful non-WSL Linux install as a heads-up for rebuilds
+  # (e.g. `brew install --HEAD`), where a low-RAM machine may OOM-kill the compiler.
+  def memory_caveat
+    "Building from source is memory-heavy; a low-RAM machine may need extra swap."
+  end
+
+  # WSL2-specific guidance, shown after a successful install when running under
+  # WSL. Covers the environment quirks that differ from a plain Ubuntu box:
+  # WSL version, distro, prefix/filesystem, SSH keys, and the ~50%-RAM OOM trap.
+  def wsl_caveat
+    <<~EOS.chomp
+      Running under WSL:
+        * Use WSL 2, not WSL 1 -- WSL 1 has known issues with Homebrew binaries.
+        * Ubuntu 24.04 is recommended (Tier 1 Homebrew support); 22.04 also works.
+        * Keep Homebrew at its default prefix (/home/linuxbrew/.linuxbrew) and build
+          from your Linux home, not a Windows path under /mnt/c.
+        * No GitHub SSH key is needed -- the formula clones submodules over HTTPS.
+        * Building is memory-heavy. WSL2 defaults to ~50% of host RAM; if a build is
+          OOM-killed ("Killed (program cc1plus)"), set a higher limit in
+          C:\\Users\\<you>\\.wslconfig under [wsl2] (e.g. "memory=8GB"), run
+          "wsl --shutdown" in Windows, then reinstall.
+    EOS
+  end
+
+  # Printed when a Linux build fails, since a killed compiler is almost always
+  # an out-of-memory kill. Tailored for WSL2, where the fix is a host-side limit.
+  def oom_guidance
+    generic = <<~EOS
+      The build may have run out of memory: each tool is one large, heavily
+      templated g++ compile that can need several GB of RAM. A failure reading
+      "internal compiler error: Killed (program cc1plus)" is an out-of-memory kill.
+    EOS
+
+    if wsl?
+      generic + <<~EOS
+
+        You appear to be on WSL2, which defaults to ~50% of host RAM. Raise the
+        limit by creating C:\\Users\\<you>\\.wslconfig with:
+
+          [wsl2]
+          memory=8GB
+          swap=8GB
+
+        then run "wsl --shutdown" in Windows PowerShell and reopen your distro
+        before retrying `brew install knoodle`.
+      EOS
+    else
+      "#{generic}\nFree up memory (close other apps) or add swap space, then retry.\n"
+    end
   end
 
   test do
