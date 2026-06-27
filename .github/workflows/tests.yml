@@ -33,11 +33,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pinned (not *-latest) for reproducibility: the floating macos-latest
-        # label silently changed toolchains mid-migration and masked a bug.
-        #   ubuntu-24.04 => Linuxbrew (also the WSL2/Ubuntu proxy)
-        #   macos-26     => supported macOS toolchain (recent Apple Clang/libc++)
-        os: [ubuntu-24.04, macos-26]
+        # macos-26 is PINNED on purpose: macos-latest can resolve to macos-15,
+        # whose libc++ lacks floating-point std::from_chars and fails the build.
+        # ubuntu-latest is deliberately UNPINNED: Ubuntu has no equivalent
+        # correctness cliff (a newer image means newer glibc/gcc, still Homebrew
+        # Tier 1), so we track -latest to catch breakage from a future Ubuntu
+        # image (e.g. 26.04) early -- ideally before users upgrade. It is a
+        # required leg, so a break fails the run and emails the maintainer; the
+        # monthly cron below guarantees detection within ~30 days without pushes.
+        #   ubuntu-latest => Linuxbrew (also the WSL2/Ubuntu proxy)
+        #   macos-26      => supported macOS toolchain (recent Apple Clang/libc++)
+        os: [ubuntu-latest, macos-26]
         include:
           # Informational: macOS 15 / Clang 17 lacks floating-point
           # std::from_chars, so the build is expected to fail there. This leg
@@ -93,3 +99,79 @@ jobs:
 
       - name: Run the formula test block
         run: brew test --verbose designbynumbers/cantarellalab/knoodle
+
+  # RHEL-family coverage. No native Fedora/RHEL GitHub runner exists, so these run
+  # as containers on ubuntu-latest:
+  #   fedora:latest => Tier 1 (recent glibc, uses system glibc like Ubuntu)
+  #   rockylinux:9  => Tier 2 (glibc 2.34 -> Homebrew bootstraps its own glibc 2.39
+  #                    + gcc); proxy for the UGA Sapelo2 cluster (Rocky 9.5).
+  # continue-on-error while we shake out the container path -- promote to a required
+  # leg (drop continue-on-error) once consistently green so failures email the
+  # maintainer. Skipped on pull_request to spare Git-LFS bandwidth on the source
+  # repo: we bump the formula on main, so push/cron/dispatch coverage is enough.
+  knoodle-rpm:
+    name: knoodle (${{ matrix.container }})
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        container: ["fedora:latest", "rockylinux:9"]
+    container:
+      image: ${{ matrix.container }}
+    env:
+      # Fixed prefix so the Git-LFS clone can be cached (mirrors the knoodle job).
+      HOMEBREW_CACHE: /home/linuxbrew/cache
+    steps:
+      - name: Install prerequisites (dnf)
+        # Tools the Ubuntu runner ships preinstalled but a bare RPM image lacks.
+        # --allowerasing: RHEL-family minimal images ship curl-minimal, which
+        # conflicts with full curl; this lets dnf swap it. No-op on Fedora.
+        # git-lfs is intentionally NOT installed here (not in Rocky 9 base repos);
+        # we use Homebrew's git-lfs below, matching the documented user flow.
+        run: |
+          dnf -y --allowerasing install \
+            gcc gcc-c++ make git procps-ng file which curl tar gzip \
+            findutils sudo util-linux diffutils
+
+      - name: Create non-root Homebrew user
+        # Homebrew refuses to run as root; its installer also calls sudo (chown),
+        # so linuxbrew needs passwordless sudo.
+        run: |
+          useradd -m -s /bin/bash linuxbrew
+          echo 'linuxbrew ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/linuxbrew
+          install -d -o linuxbrew -g linuxbrew "$HOMEBREW_CACHE"
+
+      - name: Check out tap
+        uses: actions/checkout@v4
+
+      - name: Cache knoodle source clone (avoid re-pulling Git LFS)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.HOMEBREW_CACHE }}/knoodle--git
+          key: ${{ matrix.container }}-knoodle-src-${{ hashFiles('knoodle.rb', 'lib/custom_download_strategy.rb') }}
+
+      - name: Install + test knoodle as the linuxbrew user
+        run: |
+          chown -R linuxbrew:linuxbrew "$HOMEBREW_CACHE"
+          # Give linuxbrew an owned copy of the checked-out tap to symlink in.
+          cp -a "$GITHUB_WORKSPACE" /home/linuxbrew/cantarellalab
+          chown -R linuxbrew:linuxbrew /home/linuxbrew/cantarellalab
+          runuser -u linuxbrew -- env HOMEBREW_CACHE="$HOMEBREW_CACHE" \
+            bash -eux <<'EOSU'
+          export NONINTERACTIVE=1
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          uname -m; brew --version | head -1
+          # Wire the checked-out tap (this commit, with any uncommitted edits).
+          TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
+          mkdir -p "$(dirname "$TAPDIR")"
+          ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
+          # git-lfs via Homebrew (documented flow); needed before the source fetch.
+          brew install git-lfs
+          git lfs install
+          brew audit --strict designbynumbers/cantarellalab/knoodle
+          brew install --build-from-source --verbose designbynumbers/cantarellalab/knoodle
+          brew test --verbose designbynumbers/cantarellalab/knoodle
+          EOSU
