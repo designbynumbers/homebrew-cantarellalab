@@ -138,6 +138,14 @@ class Knoodle < Formula
     (include/"knoodle").install Dir["src/*.hpp"]
     doc.install "README.md" if File.exist?("README.md")
 
+    # knoodleidentify resolves its lookup table at <exe>/../data/Klut -- which, after
+    # the bin symlink is canonicalized, is <prefix>/data/Klut. Install the KLUT there
+    # (the Klut_Keys_NN.bin + Klut_Values_NN.tsv pairs, ~23 MB of Git-LFS objects the
+    # download strategy already pulled) so the tool works out of the box; without it,
+    # knoodleidentify aborts with "Could not find KLUT data directory".
+    ohai "Installing the KLUT (knot lookup table) for knoodleidentify..."
+    (prefix/"data/Klut").install Dir["data/Klut/*"]
+
     ohai "Installation complete!"
     puts "Test with: #{bin}/polyfold --help"
     puts "           #{bin}/knoodlesimplify --help"
@@ -270,6 +278,14 @@ class Knoodle < Formula
 
     system "#{bin}/knoodlesimplify", "--help"
     system "#{bin}/knoodledraw", "--help"
-    system "#{bin}/knoodleidentify", "--help"
+
+    # `--help` does NOT touch the KLUT, so it can't catch a missing-data install.
+    # Confirm the lookup table is installed where knoodleidentify expects it, then
+    # run it on an empty input file: it resolves + fully loads the KLUT at startup
+    # (before reading diagrams) via the default <exe>/../data/Klut path, so it exits
+    # 0 only if every Klut_*_NN file installed and loads. A broken install aborts
+    # with "Could not find KLUT data directory" (non-zero -> this test fails).
+    assert_path_exists prefix/"data/Klut/Klut_Values_03.tsv"
+    system "#{bin}/knoodleidentify", File::NULL
   end
 end
