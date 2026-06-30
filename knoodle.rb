@@ -1,16 +1,15 @@
-require_relative "lib/custom_download_strategy"
-
 class Knoodle < Formula
   desc "Computational knot theory library with PolyFold and the knoodle tools"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
-  url "https://github.com/HenrikSchumacher/Knoodle.git",
-      tag:      "v1.0.1",
-      revision: "8ed1c3fa3b8d59015053fb50d290a0f7343a2eb9",
-      using:    KnoodleGitLFSDownloadStrategy
+  # Self-contained vendored source tarball, built by scripts/make-source-tarball.sh
+  # and attached to the GitHub release: submodules baked in, the pcg-cpp dep
+  # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
+  # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
+  # rewriting, and no Git-LFS bandwidth billed to the source repo.
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.2/knoodle-1.0.2-vendored.tar.gz"
+  sha256 "085fa2d91733fe884d61f8e71d56c7b1d8b936fda26775e4487401c4cc3cb499"
   license "MIT"
-
-  head "https://github.com/HenrikSchumacher/Knoodle.git", branch: "main"
 
   pour_bottle? do
     reason "This formula requires CPU-specific optimizations for maximum performance"
@@ -19,7 +18,6 @@ class Knoodle < Formula
 
   depends_on "boost"
   depends_on "clp"
-  depends_on "git-lfs"
   depends_on "metis"
   depends_on "suite-sparse"
 
@@ -32,51 +30,15 @@ class Knoodle < Formula
   end
 
   def install
-    # Platform info
     if OS.linux?
       ohai "Linux detected: building with Homebrew gcc for a recent C++ toolchain"
       ohai "This installation may take 5-10 minutes"
     end
 
-    ohai "Cloning repository and initializing submodules..."
-
-    # CRITICAL: Convert SSH submodule URLs to HTTPS before submodule init
-    # This is essential for WSL2, Docker, Linux VMs without SSH keys
-    if File.exist?(".gitmodules")
-      ohai "Converting SSH submodule URLs to HTTPS for universal compatibility..."
-
-      gitmodules_content = File.read(".gitmodules")
-
-      # Show current URLs
-      ohai "Current .gitmodules URLs:"
-      gitmodules_content.lines.each do |line|
-        puts "  #{line.strip}" if line.include?("url =")
-      end
-
-      original_content = gitmodules_content.dup
-
-      # Convert SSH URLs to HTTPS
-      # Pattern 1: git@github.com:user/repo.git or git@github.com:user/repo
-      gitmodules_content.gsub!(%r{git@github\.com:([^/\s]+/[^/\s]+?)(\.git)?(\s*)$}m, 'https://github.com/\1\3')
-      # Pattern 2: ssh://git@github.com/user/repo.git or ssh://git@github.com/user/repo
-      gitmodules_content.gsub!(%r{ssh://git@github\.com/([^/\s]+/[^/\s]+?)(\.git)?(\s*)$}m, 'https://github.com/\1\3')
-
-      if gitmodules_content == original_content
-        ohai "No SSH URLs found - no conversion needed"
-      else
-        File.write(".gitmodules", gitmodules_content)
-        ohai "Converted SSH URLs to HTTPS:"
-        gitmodules_content.lines.each do |line|
-          puts "  #{line.strip}" if line.include?("url =")
-        end
-        # Sync changes to .git/config
-        system "git", "submodule", "sync"
-      end
-    else
-      ohai "No .gitmodules file found"
-    end
-
-    system "git", "submodule", "update", "--init", "--recursive", "--depth", "1"
+    # The vendored tarball is already a complete source tree: submodules and the
+    # pcg-cpp dep are baked in, the KLUT data is included, and there is no Git-LFS
+    # or .gitmodules. So there is nothing to clone, init, or URL-rewrite here --
+    # build directly from the extracted sources.
 
     env :std
 
@@ -94,8 +56,8 @@ class Knoodle < Formula
       gcc = Formula["gcc"]
       ver = gcc.version.major
       # System gcc 13/14 on the runner hits a function_traits<bool*> error in
-      # PolyFold that Homebrew gcc 16 doesn't. (Henrik fixed the separate gcc-16
-      # -Wchanges-meaning issue in 8ed1c3f, so no suppression flag is needed.)
+      # PolyFold that Homebrew gcc 16 doesn't. (The separate gcc-16 -Wchanges-meaning
+      # issue is already fixed upstream, so no suppression flag is needed.)
       make_args << "CXX=#{gcc.opt_bin}/g++-#{ver}"
       make_args << "CC=#{gcc.opt_bin}/gcc-#{ver}"
       ohai "Building with Homebrew gcc: #{make_args.join(" ")}"
@@ -140,9 +102,9 @@ class Knoodle < Formula
 
     # knoodleidentify resolves its lookup table at <exe>/../data/Klut -- which, after
     # the bin symlink is canonicalized, is <prefix>/data/Klut. Install the KLUT there
-    # (the Klut_Keys_NN.bin + Klut_Values_NN.tsv pairs, ~23 MB of Git-LFS objects the
-    # download strategy already pulled) so the tool works out of the box; without it,
-    # knoodleidentify aborts with "Could not find KLUT data directory".
+    # (the Klut_Keys_NN.bin + Klut_Values_NN.tsv pairs, ~23 MB, baked into the vendored
+    # tarball) so the tool works out of the box; without it, knoodleidentify aborts
+    # with "Could not find KLUT data directory".
     ohai "Installing the KLUT (knot lookup table) for knoodleidentify..."
     (prefix/"data/Klut").install Dir["data/Klut/*"]
 
@@ -170,17 +132,6 @@ class Knoodle < Formula
       end
 
     <<~EOS
-      IMPORTANT: This formula requires Git LFS to clone the repository.
-
-      If installation fails with Git LFS errors, please run:
-
-        brew install git-lfs
-        git lfs install
-
-      Then retry the installation with:
-
-        brew install knoodle
-
       Knoodle has been installed with all tools optimized for #{os_name} using #{compiler_info}:
 
       PolyFold (knot-tightening):
@@ -234,7 +185,7 @@ class Knoodle < Formula
         * Ubuntu 24.04 is recommended (Tier 1 Homebrew support); 22.04 also works.
         * Keep Homebrew at its default prefix (/home/linuxbrew/.linuxbrew) and build
           from your Linux home, not a Windows path under /mnt/c.
-        * No GitHub SSH key is needed -- the formula clones submodules over HTTPS.
+        * No GitHub SSH key or Git-LFS needed -- the source is a self-contained tarball.
         * Building is memory-heavy. WSL2 defaults to ~50% of host RAM; if a build is
           OOM-killed ("Killed (program cc1plus)"), set a higher limit in
           C:\\Users\\<you>\\.wslconfig under [wsl2] (e.g. "memory=8GB"), run

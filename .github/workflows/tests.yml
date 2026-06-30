@@ -16,7 +16,6 @@ on:
   schedule:
     # 1st of each month, 07:00 UTC: catch breakage from upstream Homebrew
     # dependency bumps (boost / suite-sparse / clp / metis) before a user hits it.
-    # Monthly (not weekly) to keep Git LFS bandwidth on the source repo low.
     - cron: "0 7 1 * *"
   workflow_dispatch:
 
@@ -70,22 +69,8 @@ jobs:
           key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
           restore-keys: ${{ matrix.os }}-rubygems-
 
-      - name: Locate Homebrew download cache
-        run: echo "BREW_CACHE=$(brew --cache)" >> "$GITHUB_ENV"
-
-      # Knoodle is a Git-LFS repo (~100+ MB of objects). LFS bandwidth bills to
-      # the SOURCE repo's owner (HenrikSchumacher/Knoodle), not this tap, and the
-      # free tier is only 1 GB/month. Cache the cloned source keyed on the pinned
-      # revision so LFS is pulled once per release; weekly/re-runs hit the cache.
-      # No restore-keys on purpose: a clone from a *different* revision would
-      # trip Homebrew's tag/revision check, so we only accept an exact-revision hit.
-      - name: Cache knoodle source clone (avoid re-pulling Git LFS)
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.BREW_CACHE }}/knoodle--git
-          # Key on both the formula (pinned revision) and the download strategy
-          # (submodule/LFS clone logic) so changing either re-clones from scratch.
-          key: ${{ matrix.os }}-knoodle-src-${{ hashFiles('knoodle.rb', 'lib/custom_download_strategy.rb') }}
+      # No source cache needed: knoodle now fetches a small (~11 MB) vendored
+      # release tarball, not a Git-LFS clone -- so there's no LFS bandwidth to spare.
 
       # No manual tap step: setup-homebrew already symlinks this checkout in as
       # the designbynumbers/cantarellalab tap, so the formula under test is this
@@ -107,8 +92,9 @@ jobs:
   #                    + gcc); proxy for the UGA Sapelo2 cluster (Rocky 9.5).
   # Required leg (validated locally + on x86 CI): a break fails the run and emails
   # the maintainer -- early warning before a Fedora user or the Sapelo2 cluster
-  # hits it. Skipped on pull_request to spare Git-LFS bandwidth on the source repo:
-  # we bump the formula on main, so push/cron/dispatch coverage is enough.
+  # hits it. Skipped on pull_request to keep PR CI fast (these container legs do a
+  # full Homebrew bootstrap + source build); we bump on main, so push/cron/dispatch
+  # coverage is enough.
   knoodle-rpm:
     name: knoodle (${{ matrix.container }})
     if: github.event_name != 'pull_request'
@@ -119,20 +105,14 @@ jobs:
         container: ["fedora:latest", "rockylinux:9"]
     container:
       image: ${{ matrix.container }}
-    env:
-      # Fixed prefix so the Git-LFS clone can be cached (mirrors the knoodle job).
-      HOMEBREW_CACHE: /home/linuxbrew/cache
     steps:
       - name: Install prerequisites (dnf)
         # Tools the Ubuntu runner ships preinstalled but a bare RPM image lacks.
-        # Deliberately NOT installed:
-        #   curl  -- the base images already ship curl-minimal (provides curl);
-        #            installing full curl conflicts with it, and the --allowerasing
-        #            workaround is rejected by Fedora's dnf5 ("Unknown argument").
-        #   git-lfs -- not in Rocky 9 base repos; we use Homebrew's git-lfs below,
-        #            matching the documented user flow.
-        # `which` is best-effort: newest Fedora drops the package (brew uses
-        # command -v), while Rocky 9 still provides it.
+        # curl is deliberately NOT installed: the base images ship curl-minimal
+        # (provides curl); installing full curl conflicts with it, and the
+        # --allowerasing workaround is rejected by Fedora's dnf5. `which` is
+        # best-effort: newest Fedora drops the package (brew uses command -v),
+        # while Rocky 9 still provides it. (No git-lfs: the source is a tarball.)
         run: |
           dnf -y install \
             gcc gcc-c++ make git procps-ng file tar gzip \
@@ -145,25 +125,16 @@ jobs:
         run: |
           useradd -m -s /bin/bash linuxbrew
           echo 'linuxbrew ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/linuxbrew
-          install -d -o linuxbrew -g linuxbrew "$HOMEBREW_CACHE"
 
       - name: Check out tap
         uses: actions/checkout@v4
 
-      - name: Cache knoodle source clone (avoid re-pulling Git LFS)
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.HOMEBREW_CACHE }}/knoodle--git
-          key: ${{ matrix.container }}-knoodle-src-${{ hashFiles('knoodle.rb', 'lib/custom_download_strategy.rb') }}
-
       - name: Install + test knoodle as the linuxbrew user
         run: |
-          chown -R linuxbrew:linuxbrew "$HOMEBREW_CACHE"
           # Give linuxbrew an owned copy of the checked-out tap to symlink in.
           cp -a "$GITHUB_WORKSPACE" /home/linuxbrew/cantarellalab
           chown -R linuxbrew:linuxbrew /home/linuxbrew/cantarellalab
-          runuser -u linuxbrew -- env HOMEBREW_CACHE="$HOMEBREW_CACHE" \
-            bash -eux <<'EOSU'
+          runuser -u linuxbrew -- bash -eux <<'EOSU'
           export NONINTERACTIVE=1
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
@@ -172,9 +143,6 @@ jobs:
           TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
           mkdir -p "$(dirname "$TAPDIR")"
           ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
-          # git-lfs via Homebrew (documented flow); needed before the source fetch.
-          brew install git-lfs
-          git lfs install
           brew audit --strict designbynumbers/cantarellalab/knoodle
           brew install --build-from-source --verbose designbynumbers/cantarellalab/knoodle
           brew test --verbose designbynumbers/cantarellalab/knoodle
