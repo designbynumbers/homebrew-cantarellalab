@@ -288,6 +288,15 @@ jobs:
         run: brew install --build-from-source --verbose designbynumbers/cantarellalab/libplcurve
       - name: Run the formula test block
         run: brew test --verbose designbynumbers/cantarellalab/libplcurve
+      - name: C++ header smoke test (issue #2)
+        # plCurve.h is a public installed header, so it must be includable from C++.
+        # It currently uses the C99 `restrict` keyword (invalid in C++), so this FAILS
+        # until upstream makes the header C++-safe -- see the handoff
+        # ~/plcurve/handoff/plcurve-header-cxx-restrict. Build compiles plCurve's own C
+        # sources (restrict is fine in C), so only this consumer-style check catches it.
+        run: |
+          printf '#include <plCurve.h>\nint main(void){return 0;}\n' > cxx_smoke.cc
+          c++ -I"$(brew --prefix)/include" -fsyntax-only cxx_smoke.cc
 
   libplcurve-rpm:
     name: libplcurve (${{ matrix.container }})
@@ -331,6 +340,10 @@ jobs:
           brew audit --strict designbynumbers/cantarellalab/libplcurve
           brew install --build-from-source --verbose designbynumbers/cantarellalab/libplcurve
           brew test --verbose designbynumbers/cantarellalab/libplcurve
+          # C++ header smoke test (issue #2): plCurve.h must be includable from C++.
+          # Fails until upstream drops/guards the C99 `restrict` keyword in the header.
+          printf '#include <plCurve.h>\nint main(void){return 0;}\n' > /tmp/cxx_smoke.cc
+          c++ -I"$(brew --prefix)/include" -fsyntax-only /tmp/cxx_smoke.cc
           EOSU
 
   libtsnnls:
@@ -360,6 +373,13 @@ jobs:
         run: brew install --build-from-source --verbose designbynumbers/cantarellalab/libtsnnls
       - name: Run the formula test block
         run: brew test --verbose designbynumbers/cantarellalab/libtsnnls
+      - name: C++ header smoke test (self-containment)
+        # tsnnls.h uses FILE* (lines 71-72) without including <stdio.h>, so including it
+        # first fails to compile in C and C++ alike. FAILS until upstream adds the missing
+        # include -- see the handoff ~/tsnnls/handoff/tsnnls-header-missing-stdio.
+        run: |
+          printf '#include <libtsnnls/tsnnls.h>\nint main(void){return 0;}\n' > cxx_smoke_ts.cc
+          c++ -I"$(brew --prefix)/include" -fsyntax-only cxx_smoke_ts.cc
 
   libtsnnls-rpm:
     name: libtsnnls (${{ matrix.container }})
@@ -403,4 +423,8 @@ jobs:
           brew audit --strict designbynumbers/cantarellalab/libtsnnls
           brew install --build-from-source --verbose designbynumbers/cantarellalab/libtsnnls
           brew test --verbose designbynumbers/cantarellalab/libtsnnls
+          # C++ header smoke test: tsnnls.h must be self-contained (it uses FILE* without
+          # including <stdio.h>). Fails until upstream adds the missing include.
+          printf '#include <libtsnnls/tsnnls.h>\nint main(void){return 0;}\n' > /tmp/cxx_smoke_ts.cc
+          c++ -I"$(brew --prefix)/include" -fsyntax-only /tmp/cxx_smoke_ts.cc
           EOSU
