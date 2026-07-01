@@ -152,6 +152,103 @@ jobs:
           brew test --verbose designbynumbers/cantarellalab/knoodle
           EOSU
 
+  # Cluster-compiler regression guard (UGA Sapelo2 build path). Sapelo2 builds
+  # Knoodle with clang 18.1.8 from an EasyBuild module on Rocky 9.5 -- which USED
+  # to fail with a function_traits<... *__restrict &> template-deduction error,
+  # until the upstream TOOLS_NO_RESTRICT workaround. None of the legs above cover
+  # this: the brew legs build with gcc, and Rocky's OWN clang is 21 (builds fine).
+  # So, like the cluster, we drop in a pinned prebuilt clang 18.1.8 (NOT distro
+  # clang) and point it at gcc-13's libstdc++ -- the cluster's module is
+  # Clang/18.1.8-GCCcore-13.3.0, i.e. "use libstdc++ from GCC 13.3.0". Then we
+  # build the exact vendored tarball the knoodle formula pins:
+  #   * WITHOUT the flag it must still FAIL (proves the flag is load-bearing);
+  #   * WITH -DTOOLS_NO_RESTRICT it must build + run.
+  # Fidelity notes: OS (Rocky 9.5/glibc 2.34) and compiler (clang 18.1.8) match
+  # exactly; Boost (1.75 vs 1.85) and SuiteSparse (5.4 vs 7.10) are distro
+  # substitutes -- irrelevant to this clang-frontend bug. Full EasyBuild (eb-
+  # building the toolchain) would take hours, so a pinned prebuilt clang gives the
+  # identical frontend in ~1 min. INACTIVE for knoodle < 1.0.3 (the release that
+  # carries the fix): older pins log-and-pass so this never reds a pre-fix tree.
+  # Skipped on pull_request like the other container legs (heavy: dnf + a ~600 MB
+  # clang download); push/cron/dispatch coverage is enough.
+  knoodle-cluster-clang18:
+    name: knoodle cluster guard (Rocky 9.5 + clang 18.1.8)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:9.5
+    steps:
+      - name: Base tools (git for checkout)
+        run: dnf -y install git tar gzip
+
+      - name: Check out tap
+        uses: actions/checkout@v4
+
+      - name: Reproduce the Sapelo2 clang-18.1.8 build path
+        run: |
+          set -euo pipefail
+
+          # Pinned compiler -- Sapelo2's Clang/18.1.8, NOT Rocky's distro clang 21.
+          CLANG_VER=18.1.8
+          CLANG_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANG_VER}/clang+llvm-${CLANG_VER}-x86_64-linux-gnu-ubuntu-18.04.tar.xz"
+
+          # Read the exact tarball the formula ships, and its version.
+          URL="$(grep -oE 'https://[^"]+/knoodle-[0-9.]+-vendored\.tar\.gz' "$GITHUB_WORKSPACE/knoodle.rb" | head -1)"
+          VER="$(printf '%s' "$URL" | grep -oE 'knoodle-[0-9.]+-vendored' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+          echo "formula pins knoodle $VER"
+
+          # Gate: the TOOLS_NO_RESTRICT fix ships in 1.0.3; older pins can't pass.
+          if [ "$(printf '%s\n1.0.3\n' "$VER" | sort -V | head -1)" != "1.0.3" ]; then
+            echo "knoodle $VER < 1.0.3 (pre-fix); cluster clang-18 guard inactive."
+            exit 0
+          fi
+
+          # EPEL + CRB give boost/suitesparse; gcc-toolset-13 supplies the gcc-13
+          # libstdc++ the cluster's clang uses (Rocky's system gcc is only 11).
+          dnf -y install epel-release dnf-plugins-core
+          dnf config-manager --set-enabled crb
+          dnf -y install boost-devel suitesparse-devel gcc-toolset-13 \
+                         make xz gzip findutils file ncurses-libs libxml2
+          gccdirs=(/opt/rh/gcc-toolset-13/root/usr/lib/gcc/*/13*)
+          GXXDIR="${gccdirs[0]}"
+
+          # Drop in the pinned clang 18.1.8 (a self-contained tree, like a module).
+          mkdir -p /opt/clang
+          curl -fsSL "$CLANG_URL" | tar xJ -C /opt/clang --strip-components=1
+          CLANG=/opt/clang/bin/clang++
+          "$CLANG" --version | head -1
+
+          # Fetch + unpack the shipped vendored tarball.
+          curl -fsSL "$URL" -o /tmp/knoodle.tar.gz
+          mkdir -p /work && tar xzf /tmp/knoodle.tar.gz -C /work --strip-components=1
+          cd /work/tools
+
+          # CXX = pinned clang + gcc-13 libstdc++ (mirrors Clang/18.1.8-GCCcore-13.3.0).
+          # boost 1.75 < 1.81 -> no unordered_flat_map, so BOOST_FLAGS= (as the cluster
+          # install script documents for old Boost); umfpack lives in /usr/lib64.
+          CLUSTER_CXX="$CLANG --gcc-install-dir=$GXXDIR"
+          MK=(HOMEBREW_PREFIX=/usr BOOST_FLAGS= LDFLAGS="-L/usr/lib64 -lboost_program_options -lumfpack")
+
+          # CONTROL: without the flag, clang 18.1.8 must STILL fail (bug present).
+          echo "::group::control build (no flag) -- expected to FAIL with function_traits"
+          if make knoodlesimplify CXX="$CLUSTER_CXX" "${MK[@]}" >/tmp/noflag.log 2>&1; then
+            echo "::warning::knoodle built on clang 18.1.8 WITHOUT -DTOOLS_NO_RESTRICT -- the upstream bug looks fixed; this guard is now trivially green and can be simplified."
+          else
+            grep -m1 -E 'function_traits|__restrict' /tmp/noflag.log || true
+            echo "control failed as expected -- the flag is load-bearing."
+          fi
+          echo "::endgroup::"
+          make clean >/dev/null 2>&1 || true
+          rm -f knoodlesimplify knoodleidentify knoodledraw
+
+          # THE GUARD: with the flag, the whole tool set must build, then smoke-run.
+          echo "::group::guarded build (-DTOOLS_NO_RESTRICT) -- must succeed"
+          make CXX="$CLUSTER_CXX -DTOOLS_NO_RESTRICT" "${MK[@]}"
+          echo "::endgroup::"
+          file knoodlesimplify
+          ./knoodlesimplify --help | head -3
+          echo "cluster clang-18.1.8 guard: PASS (knoodle $VER)"
+
   # ridgerunner builds the tap's dependency chain: openblas/gsl/argtable come from
   # Homebrew core (bottled), while libplcurve and libtsnnls are tap formulae with no
   # bottles, so `brew install --build-from-source ridgerunner` compiles the whole
