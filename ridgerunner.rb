@@ -1,8 +1,8 @@
 class Ridgerunner < Formula
   desc "Knot-tightening program using constrained gradient descent"
   homepage "https://www.jasoncantarella.com/wordpress/software/ridgerunner/"
-  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.3.0/ridgerunner-2.3.0.tar.gz"
-  sha256 "3ef31c4d7131da10eb747c6814f41b24b34f0d4ca0be715b20bf29acd84fa35c"
+  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.3.1/ridgerunner-2.3.1.tar.gz"
+  sha256 "533e61c7b5897ffeedf67140f2cb400de99aea0b8206e6a818dac2ebdb707bd3"
   license "GPL-1.0-or-later"
 
   depends_on "pkg-config" => :build
