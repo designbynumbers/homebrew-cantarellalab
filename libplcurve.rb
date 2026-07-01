@@ -1,8 +1,8 @@
 class Libplcurve < Formula
   desc "Library for polygonal curves (knots and links)"
   homepage "https://www.jasoncantarella.com/"
-  url "https://github.com/designbynumbers/plcurve/releases/download/v11.2.0/libplcurve-11.2.0.tar.gz"
-  sha256 "283bc64fb510677e9e46e2275f8cda3a6e15e38c00a4cc6a2403dcdb03fbbab5"
+  url "https://github.com/designbynumbers/plcurve/releases/download/v11.2.2/libplcurve-11.2.2.tar.gz"
+  sha256 "bccb193f8b0ed5f087e02bbd0d83a4b7ca20a61a8a013ce9efb624f0eebca294"
   license "GPL-1.0-or-later"
 
   depends_on "autoconf" => :build
