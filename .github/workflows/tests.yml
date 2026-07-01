@@ -147,3 +147,101 @@ jobs:
           brew install --build-from-source --verbose designbynumbers/cantarellalab/knoodle
           brew test --verbose designbynumbers/cantarellalab/knoodle
           EOSU
+
+  # ridgerunner builds the tap's dependency chain: openblas/gsl/argtable come from
+  # Homebrew core (bottled), while libplcurve and libtsnnls are tap formulae with no
+  # bottles, so `brew install --build-from-source ridgerunner` compiles the whole
+  # chain (libplcurve -> libtsnnls -> ridgerunner) automatically. We audit only
+  # ridgerunner: libplcurve/libtsnnls still carry the pre-modernization boilerplate
+  # and would trip `audit --strict` -- they get their own audit once upstream
+  # modernizes them (a future handoff). We still `brew test` all three, since the
+  # install builds them and the tests are cheap.
+  ridgerunner:
+    name: ridgerunner (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both GitHub macOS runners are Apple Silicon now (Intel macos-13 is retired),
+        # so this is arm64 macOS + Linuxbrew. ridgerunner is plain C/autotools with no
+        # libc++ from_chars cliff, so we don't need knoodle's macos-15 tripwire leg.
+        os: [ubuntu-latest, macos-26]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out tap
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Homebrew Bundler RubyGems
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+          key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+          restore-keys: ${{ matrix.os }}-rubygems-
+
+      - name: Audit formula
+        run: brew audit --strict designbynumbers/cantarellalab/ridgerunner
+
+      - name: Install ridgerunner (build the whole chain from source)
+        run: brew install --build-from-source --verbose designbynumbers/cantarellalab/ridgerunner
+
+      - name: Run the formula test blocks (chain)
+        run: |
+          brew test --verbose designbynumbers/cantarellalab/libplcurve
+          brew test --verbose designbynumbers/cantarellalab/libtsnnls
+          brew test --verbose designbynumbers/cantarellalab/ridgerunner
+
+  # RHEL-family coverage for the ridgerunner chain, same container strategy as
+  # knoodle-rpm (no native Fedora/RHEL runner exists). Skipped on pull_request to
+  # keep PR CI fast; push/cron/dispatch coverage is enough since we bump on main.
+  ridgerunner-rpm:
+    name: ridgerunner (${{ matrix.container }})
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container: ["fedora:latest", "rockylinux:9"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: Install prerequisites (dnf)
+        # Same bare-image gap-fillers as knoodle-rpm; ridgerunner is a C/autotools
+        # build, so gcc + make + the coreutils below are all it needs on top of what
+        # Homebrew bootstraps. See the knoodle-rpm notes for the curl/which caveats.
+        run: |
+          dnf -y install \
+            gcc gcc-c++ make git procps-ng file tar gzip \
+            findutils sudo util-linux diffutils
+          dnf -y install which || true
+
+      - name: Create non-root Homebrew user
+        run: |
+          useradd -m -s /bin/bash linuxbrew
+          echo 'linuxbrew ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/linuxbrew
+
+      - name: Check out tap
+        uses: actions/checkout@v4
+
+      - name: Install + test the ridgerunner chain as the linuxbrew user
+        run: |
+          cp -a "$GITHUB_WORKSPACE" /home/linuxbrew/cantarellalab
+          chown -R linuxbrew:linuxbrew /home/linuxbrew/cantarellalab
+          runuser -u linuxbrew -- bash -eux <<'EOSU'
+          export NONINTERACTIVE=1
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          uname -m; brew --version | head -1
+          TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
+          mkdir -p "$(dirname "$TAPDIR")"
+          ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
+          brew audit --strict designbynumbers/cantarellalab/ridgerunner
+          brew install --build-from-source --verbose designbynumbers/cantarellalab/ridgerunner
+          brew test --verbose designbynumbers/cantarellalab/libplcurve
+          brew test --verbose designbynumbers/cantarellalab/libtsnnls
+          brew test --verbose designbynumbers/cantarellalab/ridgerunner
+          EOSU
