@@ -1,8 +1,8 @@
 class Libtsnnls < Formula
   desc "Fast solver for sparse non-negative least squares problems"
   homepage "https://www.jasoncantarella.com/wordpress/software/tsnnls/"
-  url "https://github.com/designbynumbers/tsnnls/releases/download/v2.5.0/libtsnnls-2.5.0.tar.gz"
-  sha256 "82d045fdd08a76bb1733813124f241f33bc04046b9586558987c8e48df404a15"
+  url "https://github.com/designbynumbers/tsnnls/releases/download/v2.5.1/libtsnnls-2.5.1.tar.gz"
+  sha256 "bba757711d5b25ce67f1d49781ca3309d02b540e7b6907edc02f88bdff8e0b67"
   license "GPL-1.0-or-later"
 
   depends_on "autoconf" => :build
