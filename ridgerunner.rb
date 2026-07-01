@@ -1,40 +1,32 @@
-# Documentation: https://docs.brew.sh/Formula-Cookbook
-#                https://rubydoc.brew.sh/Formula
-# PLEASE REMOVE ALL GENERATED COMMENTS BEFORE SUBMITTING YOUR PULL REQUEST!
 class Ridgerunner < Formula
-  desc "ridgerunner is a knot-tightening program"
+  desc "Knot-tightening program using constrained gradient descent"
   homepage "https://www.jasoncantarella.com/wordpress/software/ridgerunner/"
-  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.2.2/ridgerunner-2.2.2.tar.gz"
-
-  sha256 "01fb1ec1137d4a68056d7a613d17de0811842b75cb788c602640b4c07c805161"
+  url "https://github.com/designbynumbers/ridgerunner/releases/download/v2.3.0/ridgerunner-2.3.0.tar.gz"
+  sha256 "3ef31c4d7131da10eb747c6814f41b24b34f0d4ca0be715b20bf29acd84fa35c"
   license "GPL-1.0-or-later"
 
-  uses_from_macos "ncurses"
-  depends_on "openblas"
+  depends_on "pkg-config" => :build
   depends_on "argtable"
   depends_on "gsl"
   depends_on "libplcurve"
   depends_on "libtsnnls"
+  depends_on "openblas"
+  uses_from_macos "ncurses"
 
   def install
-    # ENV.deparallelize  # if your formula fails when building in parallel
-    # Remove unrecognized options if warned by configure
-    # https://rubydoc.brew.sh/Formula.html#std_configure_args-instance_method
-    system "./configure", *std_configure_args, "--disable-silent-rules","LDFLAGS=-L#{HOMEBREW_PREFIX}/opt/openblas/lib/","CPPFLAGS=-I#{HOMEBREW_PREFIX}/opt/openblas/include"
-    
+    # OpenBLAS is keg-only but ships openblas.pc, and Homebrew adds keg-only pkgconfig dirs to
+    # PKG_CONFIG_PATH, so configure's PKG_CHECK_MODULES([openblas]) finds it with no manual
+    # LDFLAGS/CPPFLAGS. plCurve/tsnnls/gsl/argtable are on the normal prefix search path.
+    system "./configure", *std_configure_args, "--disable-silent-rules"
+    system "make"
+    system "make", "check" # 4 fast self-tests; drop this line to keep installs lean
     system "make", "install"
   end
 
   test do
-    # `test do` will create, run in and delete a temporary directory.
-    #
-    # This test will fail and we won't accept that! For Homebrew/homebrew-core
-    # this will need to be a test that verifies the functionality of the
-    # software. Run the test with `brew test libplcurve`. Options passed
-    # to `brew install` such as `--HEAD` also need to be provided to `brew test`.
-    #
-    # The installed folder is not in the path, so use the entire path to any
-    # executables being tested: `system "#{bin}/program", "do", "something"`.
-    system "#{bin}/ridgerunner","--help"
+    # Autoscale and tighten a bundled example trefoil for two steps, then confirm output.
+    cp pkgshare/"3.1.vect", testpath
+    system bin/"ridgerunner", "-a", "-s", "2", "3.1.vect"
+    assert_path_exists testpath/"3.1.rr/3.1.final.vect"
   end
 end
