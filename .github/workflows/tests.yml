@@ -143,6 +143,10 @@ jobs:
           TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
           mkdir -p "$(dirname "$TAPDIR")"
           ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
+          # A manually-bootstrapped brew enforces HOMEBREW_REQUIRE_TAP_TRUST, so trust our
+          # symlinked tap -- otherwise loading cross-tap deps (ridgerunner -> libplcurve/
+          # libtsnnls) is refused. (setup-homebrew does this automatically on native legs.)
+          brew trust designbynumbers/cantarellalab
           brew audit --strict designbynumbers/cantarellalab/knoodle
           brew install --build-from-source --verbose designbynumbers/cantarellalab/knoodle
           brew test --verbose designbynumbers/cantarellalab/knoodle
@@ -238,6 +242,10 @@ jobs:
           TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
           mkdir -p "$(dirname "$TAPDIR")"
           ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
+          # A manually-bootstrapped brew enforces HOMEBREW_REQUIRE_TAP_TRUST, so trust our
+          # symlinked tap -- otherwise loading cross-tap deps (ridgerunner -> libplcurve/
+          # libtsnnls) is refused. (setup-homebrew does this automatically on native legs.)
+          brew trust designbynumbers/cantarellalab
           brew audit --strict designbynumbers/cantarellalab/ridgerunner
           brew install --build-from-source --verbose designbynumbers/cantarellalab/ridgerunner
           brew test --verbose designbynumbers/cantarellalab/libplcurve
@@ -316,6 +324,10 @@ jobs:
           TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
           mkdir -p "$(dirname "$TAPDIR")"
           ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
+          # A manually-bootstrapped brew enforces HOMEBREW_REQUIRE_TAP_TRUST, so trust our
+          # symlinked tap -- otherwise loading cross-tap deps (ridgerunner -> libplcurve/
+          # libtsnnls) is refused. (setup-homebrew does this automatically on native legs.)
+          brew trust designbynumbers/cantarellalab
           brew audit --strict designbynumbers/cantarellalab/libplcurve
           brew install --build-from-source --verbose designbynumbers/cantarellalab/libplcurve
           brew test --verbose designbynumbers/cantarellalab/libplcurve
@@ -384,6 +396,10 @@ jobs:
           TAPDIR="$(brew --repository)/Library/Taps/designbynumbers/homebrew-cantarellalab"
           mkdir -p "$(dirname "$TAPDIR")"
           ln -s /home/linuxbrew/cantarellalab "$TAPDIR"
+          # A manually-bootstrapped brew enforces HOMEBREW_REQUIRE_TAP_TRUST, so trust our
+          # symlinked tap -- otherwise loading cross-tap deps (ridgerunner -> libplcurve/
+          # libtsnnls) is refused. (setup-homebrew does this automatically on native legs.)
+          brew trust designbynumbers/cantarellalab
           brew audit --strict designbynumbers/cantarellalab/libtsnnls
           brew install --build-from-source --verbose designbynumbers/cantarellalab/libtsnnls
           brew test --verbose designbynumbers/cantarellalab/libtsnnls
