@@ -5,7 +5,7 @@ class Ridgerunner < Formula
   sha256 "533e61c7b5897ffeedf67140f2cb400de99aea0b8206e6a818dac2ebdb707bd3"
   license "GPL-1.0-or-later"
 
-  depends_on "pkg-config" => :build
+  depends_on "pkgconf" => :build
   depends_on "argtable"
   depends_on "gsl"
   depends_on "libplcurve"
