@@ -6,3 +6,15 @@ ridgerunner
 tsnnls
 knoodle
 
+Continuous integration
+----------------------
+
+These formulae are tested via GitHub CI actions on macOS (Apple Silicon),
+Ubuntu Linux (Homebrew on Linux), and Fedora and Rocky Linux 9 containers,
+monthly and whenever newer versions of the source projects are released.
+
+Each formula is audited (brew audit --strict), built from source, and
+exercised with its test block. The C libraries (libplcurve and libtsnnls)
+additionally get a C++ header-include smoke test, so their installed public
+headers stay usable from C++ as well as C.
+
