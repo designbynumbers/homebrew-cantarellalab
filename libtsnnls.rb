@@ -1,37 +1,27 @@
-# Documentation: https://docs.brew.sh/Formula-Cookbook
-#                https://rubydoc.brew.sh/Formula
-# PLEASE REMOVE ALL GENERATED COMMENTS BEFORE SUBMITTING YOUR PULL REQUEST!
 class Libtsnnls < Formula
-  desc "tsnnls is a fast solver for sparse non-negative least squares problems"
+  desc "Fast solver for sparse non-negative least squares problems"
   homepage "https://www.jasoncantarella.com/wordpress/software/tsnnls/"
-  url "https://github.com/designbynumbers/tsnnls/releases/download/v.2.4.5/libtsnnls-2.4.5.tar.gz"
-  sha256 "e7428a63a1cafbbd94cf035aa35e7bcf65f8935547c12529f481222f3be76935"
+  url "https://github.com/designbynumbers/tsnnls/releases/download/v2.5.0/libtsnnls-2.5.0.tar.gz"
+  sha256 "82d045fdd08a76bb1733813124f241f33bc04046b9586558987c8e48df404a15"
   license "GPL-1.0-or-later"
 
-  # depends_on "cmake" => :build
-
-  depends_on "openblas"
+  depends_on "autoconf" => :build
+  depends_on "automake" => :build
+  depends_on "libtool" => :build
+  depends_on "pkg-config" => :build
   depends_on "argtable"
+  depends_on "openblas"
 
   def install
-    # ENV.deparallelize  # if your formula fails when building in parallel
-    # Remove unrecognized options if warned by configure
-    # https://rubydoc.brew.sh/Formula.html#std_configure_args-instance_method
-    system "./configure", *std_configure_args, "--disable-silent-rules","LDFLAGS=-L#{HOMEBREW_PREFIX}/opt/openblas/lib/","CPPFLAGS=-I#{HOMEBREW_PREFIX}/opt/openblas/include"
-    
+    # Source releases ship no generated files, so bootstrap the autotools build first.
+    # OpenBLAS is keg-only but located via pkg-config (Homebrew adds its pkgconfig dir to
+    # PKG_CONFIG_PATH), so no manual LDFLAGS/CPPFLAGS are needed.
+    system "./autogen.sh"
+    system "./configure", *std_configure_args, "--disable-silent-rules"
     system "make", "install"
   end
 
   test do
-    # `test do` will create, run in and delete a temporary directory.
-    #
-    # This test will fail and we won't accept that! For Homebrew/homebrew-core
-    # this will need to be a test that verifies the functionality of the
-    # software. Run the test with `brew test libplcurve`. Options passed
-    # to `brew install` such as `--HEAD` also need to be provided to `brew test`.
-    #
-    # The installed folder is not in the path, so use the entire path to any
-    # executables being tested: `system "#{bin}/program", "do", "something"`.
-    system "#{bin}/tsnnls_test","--help"
+    system bin/"tsnnls_test", "--help"
   end
 end
