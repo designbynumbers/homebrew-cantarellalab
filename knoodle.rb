@@ -7,8 +7,8 @@ class Knoodle < Formula
   # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
   # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
   # rewriting, and no Git-LFS bandwidth billed to the source repo.
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.2/knoodle-1.0.2-vendored.tar.gz"
-  sha256 "085fa2d91733fe884d61f8e71d56c7b1d8b936fda26775e4487401c4cc3cb499"
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.3/knoodle-1.0.3-vendored.tar.gz"
+  sha256 "cc86e7bc503f8ceeec8f976fbd1e3c9b6794ddcf485f43a33b4cb62790d71863"
   license "MIT"
 
   pour_bottle? do
@@ -45,13 +45,18 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
-    # The makefiles hardcode `CXX = g++` on Linux, so the compiler must be
-    # overridden on the make command line (not via ENV). On Linux, point it at
-    # Homebrew's gcc (g++-NN); on macOS keep the configured clang.
+    # The makefiles hardcode CXX with a plain `=` (PolyFold/makefile on macOS
+    # pins an absolute, machine-specific llvm@18 path as of Knoodle 1.0.3 --
+    # see HenrikSchumacher/Knoodle upstream handoff), so the compiler must be
+    # overridden on the make command line, not via ENV: command-line make vars
+    # beat a Makefile's own `=` assignment, but ENV vars don't. On Linux, point
+    # it at Homebrew's gcc (g++-NN); on macOS, force the configured clang.
     make_args = []
     if OS.mac?
       ENV["CXX"] = ENV.cxx
       ENV["CC"] = ENV.cc
+      make_args << "CXX=#{ENV.cxx}"
+      make_args << "CC=#{ENV.cc}"
     else
       gcc = Formula["gcc"]
       ver = gcc.version.major
