@@ -7,8 +7,8 @@ class Knoodle < Formula
   # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
   # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
   # rewriting, and no Git-LFS bandwidth billed to the source repo.
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.4/knoodle-1.0.4-vendored.tar.gz"
-  sha256 "45b4cb587edff960bb1a8a1ef858c0eb16cbba657b24ec559f20ec2d9be4ccd4"
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.5/knoodle-1.0.5-vendored.tar.gz"
+  sha256 "44394d81ad1c14e9f3e3f1ad948e30162beace222b00ea6f6a1f947a558c3814"
   license "MIT"
 
   pour_bottle? do
@@ -109,7 +109,7 @@ class Knoodle < Formula
     # pairs, ~23 MB, baked into the vendored tarball) into the standard Homebrew
     # package-data location -- pkgshare, i.e. share/knoodle -> /opt/homebrew/share/knoodle/Klut.
     #
-    # As of knoodle 1.0.4, knoodleidentify resolves its own executable via the OS
+    # As of knoodle 1.0.4+, knoodleidentify resolves its own executable via the OS
     # (macOS _NSGetExecutablePath, Linux /proc/self/exe) rather than trusting argv[0],
     # and its search order includes <exe>/../share/knoodle/Klut. For a keg whose bin/
     # is symlinked into the prefix, that dereferences to exactly this pkgshare dir, so
@@ -250,7 +250,7 @@ class Knoodle < Formula
     # Run from a scratch CWD that has no data/Klut, with no $KNOODLE_KLUT_DIR set.
     # The KLUT now lives only in pkgshare (no keg-local data/Klut), so the sole
     # candidate that can satisfy the lookup is <exe>/../share/knoodle/Klut resolved
-    # from the real executable path -- i.e. this test exercises the 1.0.4 exe-relative
+    # from the real executable path -- i.e. this test exercises the 1.0.4+ exe-relative
     # resolution directly, and would go red if that regressed (which is exactly the
     # from-PATH failure the old argv[0] heuristic hid). A broken install aborts with
     # "Could not find KLUT data directory" (non-zero -> this test fails).
