@@ -7,8 +7,8 @@ class Knoodle < Formula
   # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
   # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
   # rewriting, and no Git-LFS bandwidth billed to the source repo.
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.3/knoodle-1.0.3-vendored.tar.gz"
-  sha256 "cc86e7bc503f8ceeec8f976fbd1e3c9b6794ddcf485f43a33b4cb62790d71863"
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.4/knoodle-1.0.4-vendored.tar.gz"
+  sha256 "45b4cb587edff960bb1a8a1ef858c0eb16cbba657b24ec559f20ec2d9be4ccd4"
   license "MIT"
 
   pour_bottle? do
@@ -109,25 +109,16 @@ class Knoodle < Formula
     # pairs, ~23 MB, baked into the vendored tarball) into the standard Homebrew
     # package-data location -- pkgshare, i.e. share/knoodle -> /opt/homebrew/share/knoodle/Klut.
     #
-    # knoodleidentify's built-in search order is --data-dir, $KNOODLE_KLUT_DIR,
-    # <exe>/../data/Klut, then ./data/Klut. Both path-relative fallbacks are broken
-    # under Homebrew: the tool canonicalizes argv0 against the CWD rather than the
-    # real executable, so a bare `knoodleidentify` off PATH looks in <cwd>/../data/Klut
-    # (not the keg), and ./data/Klut likewise depends on the CWD. Only an explicit
-    # `/opt/homebrew/bin/knoodleidentify ...` happened to work -- which is why the old
-    # keg-local data/Klut passed the test but failed for real from-PATH usage.
-    #
-    # So don't rely on either heuristic: wrap knoodleidentify in an env-script that
-    # pins $KNOODLE_KLUT_DIR to the installed KLUT. That candidate is absolute and
-    # checked first, so it resolves from any CWD and any invocation style. (The
-    # upstream fix -- resolve argv0 via the real exe path and also search
-    # <exe>/../share/knoodle/Klut, so no wrapper is needed -- is handed off to the
-    # Knoodle repo.)
+    # As of knoodle 1.0.4, knoodleidentify resolves its own executable via the OS
+    # (macOS _NSGetExecutablePath, Linux /proc/self/exe) rather than trusting argv[0],
+    # and its search order includes <exe>/../share/knoodle/Klut. For a keg whose bin/
+    # is symlinked into the prefix, that dereferences to exactly this pkgshare dir, so
+    # the tool finds the KLUT with no env var and no CWD/argv0 dependence. (Earlier
+    # 1.0.x needed an env-script wrapper pinning $KNOODLE_KLUT_DIR because argv[0] was
+    # resolved against the CWD; the 1.0.4 real-exe-path fix -- our upstream handoff --
+    # makes the wrapper unnecessary, so it's gone.)
     ohai "Installing the KLUT (knot lookup table) for knoodleidentify..."
     pkgshare.install "data/Klut"
-    libexec.install bin/"knoodleidentify"
-    (bin/"knoodleidentify").write_env_script libexec/"knoodleidentify",
-                                             KNOODLE_KLUT_DIR: pkgshare/"Klut"
 
     ohai "Installation complete!"
     puts "Test with: #{bin}/polyfold --help"
@@ -256,10 +247,12 @@ class Knoodle < Formula
     # empty input file: it resolves + fully loads the KLUT at startup (before reading
     # any diagram), so it exits 0 only if every Klut_*_NN file installed and loads.
     #
-    # Run from a scratch CWD that has no data/Klut. There is no keg-local data/Klut
-    # anymore, so the only thing that can satisfy the lookup is the $KNOODLE_KLUT_DIR
-    # the wrapper injects -- this exercises the real from-PATH usage that the old
-    # <exe>/../data/Klut heuristic silently broke. A broken install aborts with
+    # Run from a scratch CWD that has no data/Klut, with no $KNOODLE_KLUT_DIR set.
+    # The KLUT now lives only in pkgshare (no keg-local data/Klut), so the sole
+    # candidate that can satisfy the lookup is <exe>/../share/knoodle/Klut resolved
+    # from the real executable path -- i.e. this test exercises the 1.0.4 exe-relative
+    # resolution directly, and would go red if that regressed (which is exactly the
+    # from-PATH failure the old argv[0] heuristic hid). A broken install aborts with
     # "Could not find KLUT data directory" (non-zero -> this test fails).
     assert_path_exists pkgshare/"Klut/Klut_Values_03.tsv"
     testpath.cd do
