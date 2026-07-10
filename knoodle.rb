@@ -105,13 +105,29 @@ class Knoodle < Formula
     (include/"knoodle").install Dir["src/*.hpp"]
     doc.install "README.md" if File.exist?("README.md")
 
-    # knoodleidentify resolves its lookup table at <exe>/../data/Klut -- which, after
-    # the bin symlink is canonicalized, is <prefix>/data/Klut. Install the KLUT there
-    # (the Klut_Keys_NN.bin + Klut_Values_NN.tsv pairs, ~23 MB, baked into the vendored
-    # tarball) so the tool works out of the box; without it, knoodleidentify aborts
-    # with "Could not find KLUT data directory".
+    # Install the KLUT (knot lookup table: Klut_Keys_NN.bin + Klut_Values_NN.tsv
+    # pairs, ~23 MB, baked into the vendored tarball) into the standard Homebrew
+    # package-data location -- pkgshare, i.e. share/knoodle -> /opt/homebrew/share/knoodle/Klut.
+    #
+    # knoodleidentify's built-in search order is --data-dir, $KNOODLE_KLUT_DIR,
+    # <exe>/../data/Klut, then ./data/Klut. Both path-relative fallbacks are broken
+    # under Homebrew: the tool canonicalizes argv0 against the CWD rather than the
+    # real executable, so a bare `knoodleidentify` off PATH looks in <cwd>/../data/Klut
+    # (not the keg), and ./data/Klut likewise depends on the CWD. Only an explicit
+    # `/opt/homebrew/bin/knoodleidentify ...` happened to work -- which is why the old
+    # keg-local data/Klut passed the test but failed for real from-PATH usage.
+    #
+    # So don't rely on either heuristic: wrap knoodleidentify in an env-script that
+    # pins $KNOODLE_KLUT_DIR to the installed KLUT. That candidate is absolute and
+    # checked first, so it resolves from any CWD and any invocation style. (The
+    # upstream fix -- resolve argv0 via the real exe path and also search
+    # <exe>/../share/knoodle/Klut, so no wrapper is needed -- is handed off to the
+    # Knoodle repo.)
     ohai "Installing the KLUT (knot lookup table) for knoodleidentify..."
-    (prefix/"data/Klut").install Dir["data/Klut/*"]
+    pkgshare.install "data/Klut"
+    libexec.install bin/"knoodleidentify"
+    (bin/"knoodleidentify").write_env_script libexec/"knoodleidentify",
+                                             KNOODLE_KLUT_DIR: pkgshare/"Klut"
 
     ohai "Installation complete!"
     puts "Test with: #{bin}/polyfold --help"
@@ -236,12 +252,18 @@ class Knoodle < Formula
     system "#{bin}/knoodledraw", "--help"
 
     # `--help` does NOT touch the KLUT, so it can't catch a missing-data install.
-    # Confirm the lookup table is installed where knoodleidentify expects it, then
-    # run it on an empty input file: it resolves + fully loads the KLUT at startup
-    # (before reading diagrams) via the default <exe>/../data/Klut path, so it exits
-    # 0 only if every Klut_*_NN file installed and loads. A broken install aborts
-    # with "Could not find KLUT data directory" (non-zero -> this test fails).
-    assert_path_exists prefix/"data/Klut/Klut_Values_03.tsv"
-    system "#{bin}/knoodleidentify", File::NULL
+    # Confirm the lookup table landed in pkgshare, then run knoodleidentify on an
+    # empty input file: it resolves + fully loads the KLUT at startup (before reading
+    # any diagram), so it exits 0 only if every Klut_*_NN file installed and loads.
+    #
+    # Run from a scratch CWD that has no data/Klut. There is no keg-local data/Klut
+    # anymore, so the only thing that can satisfy the lookup is the $KNOODLE_KLUT_DIR
+    # the wrapper injects -- this exercises the real from-PATH usage that the old
+    # <exe>/../data/Klut heuristic silently broke. A broken install aborts with
+    # "Could not find KLUT data directory" (non-zero -> this test fails).
+    assert_path_exists pkgshare/"Klut/Klut_Values_03.tsv"
+    testpath.cd do
+      system bin/"knoodleidentify", File::NULL
+    end
   end
 end
