@@ -212,6 +212,14 @@ jobs:
           gccdirs=(/opt/rh/gcc-toolset-13/root/usr/lib/gcc/*/13*)
           GXXDIR="${gccdirs[0]}"
 
+          # The LLVM 18.1.8 release binary is built for ubuntu-18.04 and links
+          # libtinfo.so.5, but Rocky 9 (like the Sapelo2 cluster) only ships
+          # libtinfo.so.6 via ncurses-libs. The terminfo ABI clang relies on is
+          # compatible across the soname bump, so bridge it with a symlink --
+          # without it clang++ dies at startup with
+          # "libtinfo.so.5: cannot open shared object file" (exit 127).
+          ln -sf /usr/lib64/libtinfo.so.6 /usr/lib64/libtinfo.so.5
+
           # Drop in the pinned clang 18.1.8 (a self-contained tree, like a module).
           mkdir -p /opt/clang
           curl -fsSL "$CLANG_URL" | tar xJ -C /opt/clang --strip-components=1
