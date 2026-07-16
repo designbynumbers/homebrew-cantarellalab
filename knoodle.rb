@@ -1,5 +1,5 @@
 class Knoodle < Formula
-  desc "Computational knot theory library with PolyFold and the knoodle tools"
+  desc "Command-line knot-theory tools: PolyFold and the knoodle utilities"
   homepage "https://github.com/HenrikSchumacher/Knoodle"
 
   # Self-contained vendored source tarball, built by scripts/make-source-tarball.sh
@@ -10,6 +10,10 @@ class Knoodle < Formula
   url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.5/knoodle-1.0.5-vendored.tar.gz"
   sha256 "44394d81ad1c14e9f3e3f1ad948e30162beace222b00ea6f6a1f947a558c3814"
   license "MIT"
+
+  # Packaging-only change on the same v1.0.5 source: scoped to CLI tools, no
+  # header installation (the headers are not self-contained). url/sha unchanged.
+  revision 1
 
   pour_bottle? do
     reason "This formula requires CPU-specific optimizations for maximum performance"
@@ -100,9 +104,13 @@ class Knoodle < Formula
       raise
     end
 
-    ohai "Installing headers and documentation..."
-    include.install "Knoodle.hpp"
-    (include/"knoodle").install Dir["src/*.hpp"]
+    # NOTE: deliberately NO header installation. Knoodle's headers are not
+    # self-contained -- compiling against them needs the full transitive tree of
+    # vendored deps (Tensors, submodules, pcg-cpp, ...), which is out of scope for
+    # a Homebrew formula. This formula ships only the command-line tools; users who
+    # want to build their own Knoodle projects should clone the upstream repo (or
+    # add it as a submodule). See the caveats below.
+    ohai "Installing documentation..."
     doc.install "README.md" if File.exist?("README.md")
 
     # Install the KLUT (knot lookup table: Klut_Keys_NN.bin + Klut_Values_NN.tsv
@@ -159,8 +167,11 @@ class Knoodle < Formula
       and Xcode (roughly macOS 15 / Clang 17 and earlier) are NOT supported, because
       the build needs the floating-point std::from_chars from a newer libc++.
 
-      Header files have been installed to:
-        #{include}/knoodle/
+      This formula installs the command-line tools only, not the C++ headers: the
+      Knoodle headers are not self-contained and need the full source tree to compile
+      against. To build your own Knoodle-based project, clone the upstream repository
+      (or add it as a submodule):
+        #{homepage}
       #{linux_note}
     EOS
   end
