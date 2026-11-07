@@ -7,8 +7,8 @@ class Knoodle < Formula
   # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
   # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
   # rewriting, and no Git-LFS bandwidth billed to the source repo.
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.0.6/knoodle-1.0.6-vendored.tar.gz"
-  sha256 "0b8e97ecf68a6a4827fd700f1f1f7e3b5ada4d905de99923922aa0753fcfd5e9"
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.1.0/knoodle-1.1.0-vendored.tar.gz"
+  sha256 "27001f69d2c74f1a56456e904bf50300ddbc984267a0dea6fb9a1b53d954f878"
   license "MIT"
 
   pour_bottle? do
@@ -16,9 +16,11 @@ class Knoodle < Formula
     satisfy { false }
   end
 
+  # boost: headers for the tools, plus boost_program_options for PolyFold.
+  # suite-sparse: UMFPACK, linked by the tools and PolyFold. Nothing links METIS,
+  # and Clp is compiled only under -DKNOODLE_USE_CLP, which Knoodle's makefiles
+  # never set (v1.0.6 did not either), so both were dropped at 1.1.0.
   depends_on "boost"
-  depends_on "clp"
-  depends_on "metis"
   depends_on "suite-sparse"
 
   # Build with Homebrew's recent gcc on Linux instead of the system g++. The
@@ -45,9 +47,9 @@ class Knoodle < Formula
     ENV["KNOODLE_VERSION"] = version.to_s
     ENV["HOMEBREW_PREFIX"] = HOMEBREW_PREFIX
 
-    # The makefiles hardcode CXX with a plain `=` (PolyFold/makefile on macOS
-    # pins an absolute, machine-specific llvm@18 path as of Knoodle 1.0.3 --
-    # see HenrikSchumacher/Knoodle upstream handoff), so the compiler must be
+    # The makefiles hardcode CXX with a plain `=` (devel/PolyFold/makefile sets
+    # `CXX = clang++` on macOS; as of Knoodle 1.0.3 it even pinned an absolute,
+    # machine-specific llvm@18 path), so the compiler must be
     # overridden on the make command line, not via ENV: command-line make vars
     # beat a Makefile's own `=` assignment, but ENV vars don't. On Linux, point
     # it at Homebrew's gcc (g++-NN); on macOS, force the configured clang.
@@ -80,17 +82,22 @@ class Knoodle < Formula
     end
 
     # Build and install PolyFold, then the knoodle command-line tools
-    # (knoodlesimplify, knoodledraw, knoodleidentify). On Linux a killed compiler
-    # is almost always an out-of-memory kill, so add memory guidance to any build
-    # failure before letting Homebrew's error propagate.
+    # (knoodlesimplify, knoodledraw, knoodleidentify, knoodleprove). On Linux a
+    # killed compiler is almost always an out-of-memory kill, so add memory
+    # guidance to any build failure before letting Homebrew's error propagate.
+    #
+    # PolyFold lives in devel/PolyFold as of Knoodle 1.1.0 (upstream moved it in
+    # its "Grand cleanup"). Upstream's test/release_tarball_check now builds the
+    # tools and PolyFold from the release tarball exactly as below, so a move like
+    # that fails upstream's tests instead of this formula.
     begin
       ohai "Building PolyFold (knot-tightening tool)..."
-      cd "PolyFold" do
+      cd "devel/PolyFold" do
         system "make", *make_args
         system "make", "install", "PREFIX=#{prefix}", *make_args
       end
 
-      ohai "Building knoodle tools (simplify / draw / identify)..."
+      ohai "Building knoodle tools (simplify / draw / identify / prove)..."
       cd "tools" do
         system "make", *make_args
         system "make", "install", "PREFIX=#{prefix}", *make_args
@@ -129,6 +136,7 @@ class Knoodle < Formula
     puts "           #{bin}/knoodlesimplify --help"
     puts "           #{bin}/knoodledraw --help"
     puts "           #{bin}/knoodleidentify --help"
+    puts "           #{bin}/knoodleprove --help"
   end
 
   def caveats
@@ -157,6 +165,7 @@ class Knoodle < Formula
         #{bin}/knoodlesimplify   simplify knot/link diagrams to PD codes
         #{bin}/knoodledraw       render diagrams as ASCII/Unicode art
         #{bin}/knoodleidentify   identify knot types via the KLUT
+        #{bin}/knoodleprove      check the claims in a move-trace stream
 
       Note: On Linux this formula builds with Homebrew's gcc (a recent C++ toolchain
       is required). On macOS a recent Apple Clang / libc++ is required: older macOS
@@ -240,14 +249,19 @@ class Knoodle < Formula
   end
 
   test do
-    # polyfold returns non-zero after printing `--help` (a known issue), so we
-    # exercise a real sampler run instead: generate a couple of 8-edge samples
-    # with the squared-gyradius statistic and confirm it writes its report.
+    # A real sampler run tests more than `--help` would (which exits 0 since
+    # Knoodle 1.0.1): generate a couple of 8-edge samples with the
+    # squared-gyradius statistic and confirm it writes its report. Upstream's
+    # test/polyfold_check runs this exact invocation.
     system "#{bin}/polyfold", "-n", "8", "-N", "2", "-b", "2", "-s", "1", "-g", "-o", testpath
     assert_path_exists testpath/"Info.m"
 
     system "#{bin}/knoodlesimplify", "--help"
     system "#{bin}/knoodledraw", "--help"
+    system "#{bin}/knoodleprove", "--help"
+    # The tools self-describe from KNOODLE_VERSION (set in install above); check
+    # the version actually reached the binary, not "unknown".
+    assert_match version.to_s, shell_output("#{bin}/knoodleprove --version")
 
     # `--help` does NOT touch the KLUT, so it can't catch a missing-data install.
     # Confirm the lookup table landed in pkgshare, then run knoodleidentify on an
