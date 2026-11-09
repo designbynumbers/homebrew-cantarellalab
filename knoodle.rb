@@ -264,20 +264,47 @@ class Knoodle < Formula
     assert_match version.to_s, shell_output("#{bin}/knoodleprove --version")
 
     # `--help` does NOT touch the KLUT, so it can't catch a missing-data install.
-    # Confirm the lookup table landed in pkgshare, then run knoodleidentify on an
-    # empty input file: it resolves + fully loads the KLUT at startup (before reading
-    # any diagram), so it exits 0 only if every Klut_*_NN file installed and loads.
+    # Confirm the lookup table landed in pkgshare, then have knoodleidentify name
+    # a trefoil and 13a1 and check the names. An empty input is not enough: up to
+    # 1.1.0, knoodleidentify read a subtable only when a knot of that size
+    # arrived, so an empty run passed even with every keys file missing
+    # (Knoodle's docs/klut-table-failure-audit.md). A 3- and a 13-crossing knot
+    # read the smallest and the largest subtable on any version.
     #
     # Run from a scratch CWD that has no data/Klut, with no $KNOODLE_KLUT_DIR set.
     # The KLUT now lives only in pkgshare (no keg-local data/Klut), so the sole
     # candidate that can satisfy the lookup is <exe>/../share/knoodle/Klut resolved
     # from the real executable path -- i.e. this test exercises the 1.0.4+ exe-relative
     # resolution directly, and would go red if that regressed (which is exactly the
-    # from-PATH failure the old argv[0] heuristic hid). A broken install aborts with
-    # "Could not find KLUT data directory" (non-zero -> this test fails).
+    # from-PATH failure the old argv[0] heuristic hid). A broken install exits
+    # nonzero with an error naming the directory, and shell_output fails the test.
+    #
+    # From the release that adds --verify-tables (after 1.1.0), also run
+    #   system bin/"knoodleidentify", "--verify-tables"
+    # which checks every table file's SHA-256 against Klut_Manifest.txt.
     assert_path_exists pkgshare/"Klut/Klut_Values_03.tsv"
+    (testpath/"knots.tsv").write <<~EOS
+      2 0 3 5 1
+      0 4 1 3 1
+      4 2 5 1 1
+      k
+      22 0 23 25 1
+      0 6 1 5 1
+      12 1 13 2 -1
+      2 11 3 12 -1
+      20 3 21 4 -1
+      4 19 5 20 -1
+      6 14 7 13 1
+      10 8 11 7 1
+      8 15 9 16 -1
+      14 9 15 10 -1
+      16 22 17 21 1
+      24 17 25 18 -1
+      18 23 19 24 -1
+    EOS
     testpath.cd do
-      system bin/"knoodleidentify", File::NULL
+      assert_equal "K[3,1,1,\"e/r\"]\nK[13,1,1,\"e/r\"]\n",
+                   shell_output("#{bin}/knoodleidentify --expanded knots.tsv")
     end
   end
 end
