@@ -32,8 +32,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-26 is PINNED on purpose: macos-latest can resolve to macos-15,
-        # whose libc++ lacks floating-point std::from_chars and fails the build.
+        # The macOS runners are PINNED, so both supported Apple toolchains are
+        # tested by name (macos-latest moves without notice).
         # ubuntu-latest is deliberately UNPINNED: Ubuntu has no equivalent
         # correctness cliff (a newer image means newer glibc/gcc, still Homebrew
         # Tier 1), so we track -latest to catch breakage from a future Ubuntu
@@ -41,15 +41,18 @@ jobs:
         # required leg, so a break fails the run and emails the maintainer; the
         # monthly cron below guarantees detection within ~30 days without pushes.
         #   ubuntu-latest => Linuxbrew (also the WSL2/Ubuntu proxy)
-        #   macos-26      => supported macOS toolchain (recent Apple Clang/libc++)
-        os: [ubuntu-latest, macos-26]
-        include:
-          # Informational: macOS 15 / Clang 17 lacks floating-point
-          # std::from_chars, so the build is expected to fail there. This leg
-          # documents the unsupported boundary and acts as a tripwire if the
-          # upstream code ever gains a fallback; it does not fail the workflow.
-          - os: macos-15
-            experimental: true
+        #   macos-26      => the current Apple Clang / libc++
+        #   macos-15      => the older Apple toolchain: the image's default
+        #                    Xcode 16.4 (Apple clang 17), what macOS 15 users build
+        #                    with. A required leg since Knoodle 1.2.0. It was an
+        #                    informational tripwire while Clang 17 lacked
+        #                    floating-point std::from_chars, and it had been passing
+        #                    since at least 2026-08. If it starts failing again,
+        #                    decide then whether to make it informational again
+        #                    (an `experimental: true` include entry) or drop it.
+        #                    GitHub sometimes cannot find a macOS runner and
+        #                    cancels the job ("not acquired by Runner"); re-run it.
+        os: [ubuntu-latest, macos-26, macos-15]
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental == true }}
     steps:
@@ -270,8 +273,8 @@ jobs:
       fail-fast: false
       matrix:
         # Both GitHub macOS runners are Apple Silicon now (Intel macos-13 is retired),
-        # so this is arm64 macOS + Linuxbrew. ridgerunner is plain C/autotools with no
-        # libc++ from_chars cliff, so we don't need knoodle's macos-15 tripwire leg.
+        # so this is arm64 macOS + Linuxbrew. ridgerunner is plain C/autotools, so
+        # one macOS runner is enough; knoodle's C++20 build tests two.
         os: [ubuntu-latest, macos-26]
     runs-on: ${{ matrix.os }}
     steps:

@@ -7,8 +7,8 @@ class Knoodle < Formula
   # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
   # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
   # rewriting, and no Git-LFS bandwidth billed to the source repo.
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.1.0/knoodle-1.1.0-vendored.tar.gz"
-  sha256 "27001f69d2c74f1a56456e904bf50300ddbc984267a0dea6fb9a1b53d954f878"
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.2.0/knoodle-1.2.0-vendored.tar.gz"
+  sha256 "728f544a15d2f6bc09ec936edbcf97aa1dfe43c266d2eef61bb2b6b8350bc4f1"
   license "MIT"
 
   pour_bottle? do
@@ -168,9 +168,8 @@ class Knoodle < Formula
         #{bin}/knoodleprove      check the claims in a move-trace stream
 
       Note: On Linux this formula builds with Homebrew's gcc (a recent C++ toolchain
-      is required). On macOS a recent Apple Clang / libc++ is required: older macOS
-      and Xcode (roughly macOS 15 / Clang 17 and earlier) are NOT supported, because
-      the build needs the floating-point std::from_chars from a newer libc++.
+      is required). On macOS it builds with Apple Clang, and it is tested on macOS 15
+      (Xcode 16.4) and macOS 26.
 
       This formula installs the command-line tools only, not the C++ headers: the
       Knoodle headers are not self-contained and need the full source tree to compile
@@ -279,10 +278,12 @@ class Knoodle < Formula
     # from-PATH failure the old argv[0] heuristic hid). A broken install exits
     # nonzero with an error naming the directory, and shell_output fails the test.
     #
-    # From the release that adds --verify-tables (after 1.1.0), also run
-    #   system bin/"knoodleidentify", "--verify-tables"
-    # which checks every table file's SHA-256 against Klut_Manifest.txt.
+    # Since 1.2.0, --verify-tables checks every installed table file's size and
+    # SHA-256 against Klut_Manifest.txt (installed beside the tables by
+    # `pkgshare.install "data/Klut"`) and exits nonzero on any mismatch.
     assert_path_exists pkgshare/"Klut/Klut_Values_03.tsv"
+    assert_path_exists pkgshare/"Klut/Klut_Manifest.txt"
+    system bin/"knoodleidentify", "--verify-tables"
     (testpath/"knots.tsv").write <<~EOS
       2 0 3 5 1
       0 4 1 3 1
