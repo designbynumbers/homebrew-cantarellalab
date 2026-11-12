@@ -7,8 +7,8 @@ class Knoodle < Formula
   # vendored, the KLUT data included, and NO Git-LFS. This replaces the old
   # git+LFS+submodule clone -- so no git-lfs dependency, no SSH-submodule URL
   # rewriting, and no Git-LFS bandwidth billed to the source repo.
-  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.2.0/knoodle-1.2.0-vendored.tar.gz"
-  sha256 "728f544a15d2f6bc09ec936edbcf97aa1dfe43c266d2eef61bb2b6b8350bc4f1"
+  url "https://github.com/HenrikSchumacher/Knoodle/releases/download/v1.2.1/knoodle-1.2.1-vendored.tar.gz"
+  sha256 "f379eb723ccfb21b8ab50b4ed99aa020afd15bdeeb21a767f7f254f49abfb389"
   license "MIT"
 
   pour_bottle? do
